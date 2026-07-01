@@ -2,11 +2,13 @@ import base64
 import json
 from types import SimpleNamespace
 
-from canvas_sdk.effects import EffectType
+import pytest
+from canvas_sdk.effects import Effect, EffectType
 from canvas_sdk.events import EventType
 
 from lab_order_workflow_example.handlers.endpoint_handler import LabOrderWorkflowIntakeEndpoint
 from lab_order_workflow_example.models import LabOrderWorkflowState
+from lab_order_workflow_example.services import order_workflow
 
 
 def _build_simple_api_event(
@@ -30,15 +32,45 @@ def _build_simple_api_event(
 
 
 def _parse_json_response(effects: list) -> tuple[int, dict]:
-    assert len(effects) == 1
-    assert effects[0].type == EffectType.SIMPLE_API_RESPONSE
+    response_effects = [effect for effect in effects if effect.type == EffectType.SIMPLE_API_RESPONSE]
+    assert len(response_effects) == 1
 
-    response_payload = json.loads(effects[0].payload)
+    response_payload = json.loads(response_effects[0].payload)
     response_body = json.loads(base64.b64decode(response_payload["body"]).decode())
     return response_payload["status_code"], response_body
 
 
-def test_endpoint_creates_ready_to_send_workflow_state_for_auto_approved_ecs() -> None:
+class _FakeNote:
+    calls: list[dict] = []
+
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
+        type(self).calls.append(kwargs)
+
+    def create(self) -> Effect:
+        return Effect(type="CREATE_NOTE", payload="{}")
+
+
+class _FakeLabOrderCommand:
+    calls: list[dict] = []
+
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
+        type(self).calls.append(kwargs)
+
+    def originate(self) -> Effect:
+        return Effect(type="ORIGINATE_LAB_ORDER_COMMAND", payload="{}")
+
+
+@pytest.fixture(autouse=True)
+def _stub_canvas_effect_builders(monkeypatch: pytest.MonkeyPatch) -> None:
+    _FakeNote.calls = []
+    _FakeLabOrderCommand.calls = []
+    monkeypatch.setattr(order_workflow, "Note", _FakeNote)
+    monkeypatch.setattr(order_workflow, "LabOrderCommand", _FakeLabOrderCommand)
+
+
+def test_endpoint_creates_note_and_ready_to_send_workflow_state() -> None:
     payload = {
         "external_checkout_id": "chk_123",
         "patient": {
@@ -47,6 +79,14 @@ def test_endpoint_creates_ready_to_send_workflow_state_for_auto_approved_ecs() -
             "last_name": "Doe",
             "dob": "1990-01-01",
         },
+        "note_creation": {
+            "note_type_id": "nt_review",
+            "provider_id": "staff_gc",
+            "practice_location_id": "pl_main",
+            "title": "Genetic test order review",
+        },
+        "lab_partner": "Generic Lab",
+        "test_order_codes": ["INT03"],
         "screening_type": "ecs",
         "test_code": "ECS_STANDARD",
         "ashkenazi_jewish_ancestry": False,
@@ -56,18 +96,31 @@ def test_endpoint_creates_ready_to_send_workflow_state_for_auto_approved_ecs() -
 
     handler = LabOrderWorkflowIntakeEndpoint(event=_build_simple_api_event(payload))
 
-    status_code, response = _parse_json_response(handler.compute())
+    effects = handler.compute()
+    status_code, response = _parse_json_response(effects)
     workflow_state = LabOrderWorkflowState.objects.get(request_id=response["request_id"])
 
     assert status_code == 200
     assert response["workflow_status"] == "ready_to_send"
     assert response["next_action"] == "await_canvas_send"
+    assert response["canvas_order_id"] is None
+    assert response["note_uuid"] == workflow_state.note_uuid
+    assert response["command_uuid"] == workflow_state.command_uuid
+
+    assert len(effects) == 3
+    assert _FakeNote.calls[0]["instance_id"] == workflow_state.note_uuid
+    assert _FakeLabOrderCommand.calls[0]["note_uuid"] == workflow_state.note_uuid
+    assert _FakeLabOrderCommand.calls[0]["tests_order_codes"] == ["INT03"]
+    assert _FakeLabOrderCommand.calls[0]["comment"] == f"workflow:{workflow_state.request_id}"
+
     assert workflow_state.external_checkout_id == "chk_123"
+    assert workflow_state.canvas_order_id is None
     assert workflow_state.workflow_status == "ready_to_send"
-    assert workflow_state.screening_type == "ecs"
+    assert workflow_state.lab_partner == "Generic Lab"
+    assert workflow_state.test_order_codes == ["INT03"]
 
 
-def test_endpoint_creates_needs_review_workflow_state_for_manual_review_request() -> None:
+def test_endpoint_uses_existing_note_for_manual_review_request() -> None:
     payload = {
         "external_checkout_id": "chk_manual_123",
         "patient": {
@@ -76,6 +129,8 @@ def test_endpoint_creates_needs_review_workflow_state_for_manual_review_request(
             "last_name": "Lee",
             "dob": "1988-02-03",
         },
+        "note_uuid": "note_existing_123",
+        "test_order_codes": ["INT01", "INT02"],
         "screening_type": "cancer",
         "test_code": "CANCER_STANDARD",
         "ashkenazi_jewish_ancestry": True,
@@ -85,12 +140,19 @@ def test_endpoint_creates_needs_review_workflow_state_for_manual_review_request(
 
     handler = LabOrderWorkflowIntakeEndpoint(event=_build_simple_api_event(payload))
 
-    status_code, response = _parse_json_response(handler.compute())
+    effects = handler.compute()
+    status_code, response = _parse_json_response(effects)
     workflow_state = LabOrderWorkflowState.objects.get(request_id=response["request_id"])
 
     assert status_code == 200
     assert response["workflow_status"] == "needs_review"
     assert response["next_action"] == "manual_review"
+    assert response["note_uuid"] == "note_existing_123"
+
+    assert len(effects) == 2
+    assert _FakeNote.calls == []
+    assert _FakeLabOrderCommand.calls[0]["note_uuid"] == "note_existing_123"
+    assert _FakeLabOrderCommand.calls[0]["lab_partner"] == "Generic Lab"
     assert workflow_state.workflow_status == "needs_review"
     assert workflow_state.requires_manual_review is True
 
@@ -125,7 +187,11 @@ def test_get_endpoint_returns_workflow_state_by_request_id() -> None:
         request_id="req_lookup",
         external_checkout_id="chk_lookup",
         canvas_patient_id="pat_lookup",
-        canvas_order_id="ord_lookup",
+        note_uuid="note_lookup",
+        canvas_order_id=None,
+        command_uuid="cmd_lookup",
+        lab_partner="Generic Lab",
+        test_order_codes=["INT03"],
         screening_type="ecs",
         test_code="ECS_STANDARD",
         requires_manual_review=False,
@@ -143,7 +209,10 @@ def test_get_endpoint_returns_workflow_state_by_request_id() -> None:
 
     assert status_code == 200
     assert response["request_id"] == workflow_state.request_id
-    assert response["canvas_order_id"] == workflow_state.canvas_order_id
+    assert response["note_uuid"] == workflow_state.note_uuid
+    assert response["canvas_order_id"] is None
+    assert response["command_uuid"] == workflow_state.command_uuid
+    assert response["test_order_codes"] == ["INT03"]
     assert response["workflow_status"] == "ready_to_send"
     assert response["sent_at"] is None
 
@@ -153,7 +222,11 @@ def test_get_endpoint_returns_workflow_state_by_canvas_order_id() -> None:
         request_id="req_order_lookup",
         external_checkout_id="chk_order_lookup",
         canvas_patient_id="pat_order_lookup",
-        canvas_order_id="ord_order_lookup",
+        note_uuid="note_order_lookup",
+        canvas_order_id="real_ord_lookup",
+        command_uuid="cmd_order_lookup",
+        lab_partner="Generic Lab",
+        test_order_codes=["INT01", "INT02"],
         screening_type="cancer",
         test_code="CANCER_STANDARD",
         requires_manual_review=True,
@@ -163,7 +236,7 @@ def test_get_endpoint_returns_workflow_state_by_canvas_order_id() -> None:
     handler = LabOrderWorkflowIntakeEndpoint(
         event=_build_simple_api_event(
             method="GET",
-            query_string="canvas_order_id=ord_order_lookup",
+            query_string="canvas_order_id=real_ord_lookup",
         )
     )
 

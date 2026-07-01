@@ -1,4 +1,10 @@
-from django.db.models import BooleanField, CharField, DateTimeField, UniqueConstraint
+from django.db.models import (
+    JSONField,
+    BooleanField,
+    CharField,
+    DateTimeField,
+    UniqueConstraint,
+)
 
 from canvas_sdk.v1.data.base import CustomModel
 
@@ -22,7 +28,11 @@ class LabOrderWorkflowState(CustomModel):
     request_id = CharField(max_length=64)
     external_checkout_id = CharField(max_length=128)
     canvas_patient_id = CharField(max_length=64)
-    canvas_order_id = CharField(max_length=64)
+    note_uuid = CharField(max_length=64)
+    canvas_order_id = CharField(max_length=64, null=True, blank=True)
+    command_uuid = CharField(max_length=64)
+    lab_partner = CharField(max_length=128)
+    test_order_codes = JSONField(default=list)
     screening_type = CharField(max_length=32)
     test_code = CharField(max_length=64)
     requires_manual_review = BooleanField(default=False)

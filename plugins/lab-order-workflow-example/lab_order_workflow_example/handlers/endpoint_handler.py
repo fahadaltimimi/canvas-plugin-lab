@@ -80,20 +80,24 @@ class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
                 )
             ]
 
-        workflow_state = start_workflow(mapped_payload)
+        workflow_state, workflow_effects = start_workflow(mapped_payload)
 
         log.info(
-            "[LabOrderWorkflowIntakeEndpoint] Created workflow request_id=%s canvas_order_id=%s status=%s",
+            "[LabOrderWorkflowIntakeEndpoint] Created workflow request_id=%s note_uuid=%s canvas_order_id=%s status=%s",
             workflow_state.request_id,
+            workflow_state.note_uuid,
             workflow_state.canvas_order_id,
             workflow_state.workflow_status,
         )
 
         return [
+            *workflow_effects,
             JSONResponse(
                 content={
                     "request_id": workflow_state.request_id,
                     "canvas_order_id": workflow_state.canvas_order_id,
+                    "command_uuid": workflow_state.command_uuid,
+                    "note_uuid": workflow_state.note_uuid,
                     "workflow_status": workflow_state.workflow_status,
                     "next_action": next_action_for_status(workflow_state.workflow_status),
                 },
@@ -115,7 +119,11 @@ def _serialize_workflow_state(workflow_state: LabOrderWorkflowState) -> dict:
         "request_id": workflow_state.request_id,
         "external_checkout_id": workflow_state.external_checkout_id,
         "canvas_patient_id": workflow_state.canvas_patient_id,
+        "note_uuid": workflow_state.note_uuid,
         "canvas_order_id": workflow_state.canvas_order_id,
+        "command_uuid": workflow_state.command_uuid,
+        "lab_partner": workflow_state.lab_partner,
+        "test_order_codes": workflow_state.test_order_codes,
         "screening_type": workflow_state.screening_type,
         "test_code": workflow_state.test_code,
         "requires_manual_review": workflow_state.requires_manual_review,

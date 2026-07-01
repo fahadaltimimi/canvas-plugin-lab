@@ -3,7 +3,10 @@ from canvas_sdk.events import EventType
 from canvas_sdk.handlers import BaseHandler
 from logger import log
 
-from lab_order_workflow_example.services import extract_order_state, update_workflow_for_sent_order
+from lab_order_workflow_example.services import (
+    extract_order_state,
+    update_workflow_for_canvas_order_event,
+)
 
 
 class LabOrderSentStateHandler(BaseHandler):
@@ -11,19 +14,25 @@ class LabOrderSentStateHandler(BaseHandler):
 
     def compute(self) -> list[Effect]:
         order_state = extract_order_state(self.event.context)
-        if order_state != "sent":
-            return []
-
-        updated_state = update_workflow_for_sent_order(self.event.target.id)
+        updated_state = update_workflow_for_canvas_order_event(self.event.target.id, self.event.context)
         if updated_state is None:
             log.info(
-                "[LabOrderSentStateHandler] Ignored sent event for unknown canvas_order_id=%s",
+                "[LabOrderSentStateHandler] Ignored %s event for unknown canvas_order_id=%s",
+                order_state or "unknown-state",
                 self.event.target.id,
             )
             return []
 
-        log.info(
-            "[LabOrderSentStateHandler] Marked canvas_order_id=%s as sent",
-            self.event.target.id,
-        )
+        if order_state == "sent":
+            log.info(
+                "[LabOrderSentStateHandler] Marked canvas_order_id=%s as sent",
+                self.event.target.id,
+            )
+        else:
+            log.info(
+                "[LabOrderSentStateHandler] Linked request_id=%s to canvas_order_id=%s state=%s",
+                updated_state.request_id,
+                self.event.target.id,
+                order_state or "unknown",
+            )
         return []

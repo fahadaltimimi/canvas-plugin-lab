@@ -1,0 +1,32 @@
+info:
+  name: lab-order-workflow-example/orders
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: https://jlab-dev.canvasmedical.com/plugin-io/api/lab_order_workflow_example/lab-order-workflow-example/orders
+  body:
+    type: json
+    data: |-
+      {
+        "external_checkout_id": "chk_123",
+        "patient": {
+          "canvas_patient_id": "pat_123",
+          "first_name": "Jane",
+          "last_name": "Doe",
+          "dob": "1990-01-01"
+        },
+        "screening_type": "ecs",
+        "test_code": "ECS_STANDARD",
+        "ashkenazi_jewish_ancestry": false,
+        "requires_manual_review": false,
+        "submitted_at": "2026-07-01T10:00:00Z"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

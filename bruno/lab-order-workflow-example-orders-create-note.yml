@@ -1,0 +1,53 @@
+info:
+  name: lab-order-workflow-example/orders (create note)
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: https://jlab-dev.canvasmedical.com/plugin-io/api/lab_order_workflow_example/lab-order-workflow-example/orders
+  body:
+    type: json
+    data: |-
+      {
+        "external_checkout_id": "chk_create_note_001",
+        "patient": {
+          "canvas_patient_id": "REPLACE_WITH_PATIENT_UUID",
+          "first_name": "Jane",
+          "last_name": "Doe",
+          "dob": "1990-01-01"
+        },
+        "note_creation": {
+          "note_type_id": "REPLACE_WITH_NOTE_TYPE_UUID_FOR_GENETIC_TEST_ORDER_REVIEW",
+          "provider_id": "REPLACE_WITH_PROVIDER_STAFF_UUID",
+          "practice_location_id": "REPLACE_WITH_PRACTICE_LOCATION_UUID",
+          "title": "Genetic test order review"
+        },
+        "lab_partner": "Generic Lab",
+        "test_order_codes": [
+          "INT03"
+        ],
+        "screening_type": "ecs",
+        "test_code": "ECS_STANDARD",
+        "ashkenazi_jewish_ancestry": false,
+        "requires_manual_review": true,
+        "submitted_at": "2026-07-01T10:00:00Z"
+      }
+  auth: inherit
+
+meta:
+  notes: |-
+    This request exercises the create-note path before lab-order origination.
+    The new note type was created with:
+    - system: https://jscreen.org/fhir/CodeSystem/note-types
+    - code: genetic-test-order-review
+
+    The current plugin implementation still requires note_creation.note_type_id,
+    which must be the Canvas NoteType UUID, not the Django admin row id in
+    /admin/api/notetype/<row-id>/change/.
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

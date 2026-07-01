@@ -35,6 +35,10 @@ def find_by_canvas_order_id(canvas_order_id: str) -> LabOrderWorkflowState | Non
     return LabOrderWorkflowState.objects.filter(canvas_order_id=canvas_order_id).first()
 
 
+def find_by_request_id(request_id: str) -> LabOrderWorkflowState | None:
+    return LabOrderWorkflowState.objects.filter(request_id=request_id).first()
+
+
 def mark_as_sent(canvas_order_id: str) -> LabOrderWorkflowState | None:
     workflow_state = find_by_canvas_order_id(canvas_order_id)
     if workflow_state is None:

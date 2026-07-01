@@ -37,8 +37,10 @@ The plugin:
    - `needs_review` when manual review is required
    - `ready_to_send` when the example treats the request as auto-approvable
 5. returns a structured JSON response with identifiers and current state
-6. listens for the related Canvas lab order to become `sent`
-7. records that `sent` transition as the final state in the example workflow
+6. exposes a temporary read endpoint so instance testing can inspect stored
+   workflow state by `request_id` or `canvas_order_id`
+7. listens for the related Canvas lab order to become `sent`
+8. records that `sent` transition as the final state in the example workflow
 
 ## Trigger Surface And Workflow Location
 
@@ -46,6 +48,11 @@ The plugin:
 
 - custom HTTP endpoint exposed by a Canvas Simple API handler
 - intended caller: an external purchase-flow application
+
+### Validation Trigger
+
+- custom HTTP read endpoint exposed by the same Canvas Simple API handler
+- intended caller: developer/UAT validation during learning and debugging
 
 ### Canvas-Side Follow-Up Trigger
 
@@ -82,6 +89,22 @@ The plugin:
 }
 ```
 
+## Example Read Response Payload
+
+```json
+{
+  "request_id": "req_123",
+  "external_checkout_id": "chk_123",
+  "canvas_patient_id": "pat_123",
+  "canvas_order_id": "ord_456",
+  "screening_type": "ecs",
+  "test_code": "ECS_STANDARD",
+  "requires_manual_review": false,
+  "workflow_status": "ready_to_send",
+  "sent_at": null
+}
+```
+
 ## Tracked Example State
 
 - `request_id`
@@ -109,6 +132,7 @@ The plugin:
 
 - one workflow-scoped plugin: `lab-order-workflow-example`
 - one Simple API endpoint for intake
+- one temporary Simple API read endpoint for workflow-state inspection
 - one lab-order state handler for `sent` tracking
 - one small custom-data namespace for durable example state
 - one custom model for the tracked workflow row
@@ -124,5 +148,9 @@ The plugin:
   tracked workflow row and records `sent_at`.
 - A `LAB_ORDER_UPDATED` event for an unknown order is handled safely and does
   not crash.
+- A GET request with either `request_id` or `canvas_order_id` returns the
+  current tracked workflow row.
+- A GET request with neither or both lookup parameters returns a 400 response.
+- A GET request for an unknown workflow row returns a 404 response.
 - The plugin documentation states clearly that downstream shipment release is
   out of scope for this example.

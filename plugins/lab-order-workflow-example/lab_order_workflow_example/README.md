@@ -18,9 +18,14 @@ downstream handoff should proceed.
 ## Endpoint
 
 - `POST /lab-order-workflow-example/orders`
+- `GET /lab-order-workflow-example/orders?request_id=<id>`
+- `GET /lab-order-workflow-example/orders?canvas_order_id=<id>`
 
 The request uses a simplified genetic-screening payload with patient identity,
 screening type, test code, and whether manual review is required.
+
+The temporary GET endpoint is for learning and UAT. It returns the stored
+workflow row when exactly one lookup parameter is provided.
 
 ## Workflow Statuses
 

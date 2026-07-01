@@ -9,14 +9,20 @@ from lab_order_workflow_example.handlers.endpoint_handler import LabOrderWorkflo
 from lab_order_workflow_example.models import LabOrderWorkflowState
 
 
-def _build_simple_api_event(payload: dict) -> SimpleNamespace:
+def _build_simple_api_event(
+    payload: dict | None = None,
+    *,
+    method: str = "POST",
+    path: str = "/lab-order-workflow-example/orders",
+    query_string: str = "",
+) -> SimpleNamespace:
     return SimpleNamespace(
         type=EventType.SIMPLE_API_REQUEST,
         context={
-            "method": "POST",
-            "path": "/lab-order-workflow-example/orders",
-            "query_string": "",
-            "body": base64.b64encode(json.dumps(payload).encode()).decode(),
+            "method": method,
+            "path": path,
+            "query_string": query_string,
+            "body": base64.b64encode(json.dumps(payload or {}).encode()).decode(),
             "headers": {"Content-Type": "application/json"},
         },
         target=SimpleNamespace(id=""),
@@ -113,3 +119,86 @@ def test_endpoint_rejects_invalid_payload_without_creating_state() -> None:
     assert response["error"] == "invalid_request"
     assert LabOrderWorkflowState.objects.count() == 0
 
+
+def test_get_endpoint_returns_workflow_state_by_request_id() -> None:
+    workflow_state = LabOrderWorkflowState.objects.create(
+        request_id="req_lookup",
+        external_checkout_id="chk_lookup",
+        canvas_patient_id="pat_lookup",
+        canvas_order_id="ord_lookup",
+        screening_type="ecs",
+        test_code="ECS_STANDARD",
+        requires_manual_review=False,
+        workflow_status="ready_to_send",
+    )
+
+    handler = LabOrderWorkflowIntakeEndpoint(
+        event=_build_simple_api_event(
+            method="GET",
+            query_string="request_id=req_lookup",
+        )
+    )
+
+    status_code, response = _parse_json_response(handler.compute())
+
+    assert status_code == 200
+    assert response["request_id"] == workflow_state.request_id
+    assert response["canvas_order_id"] == workflow_state.canvas_order_id
+    assert response["workflow_status"] == "ready_to_send"
+    assert response["sent_at"] is None
+
+
+def test_get_endpoint_returns_workflow_state_by_canvas_order_id() -> None:
+    workflow_state = LabOrderWorkflowState.objects.create(
+        request_id="req_order_lookup",
+        external_checkout_id="chk_order_lookup",
+        canvas_patient_id="pat_order_lookup",
+        canvas_order_id="ord_order_lookup",
+        screening_type="cancer",
+        test_code="CANCER_STANDARD",
+        requires_manual_review=True,
+        workflow_status="needs_review",
+    )
+
+    handler = LabOrderWorkflowIntakeEndpoint(
+        event=_build_simple_api_event(
+            method="GET",
+            query_string="canvas_order_id=ord_order_lookup",
+        )
+    )
+
+    status_code, response = _parse_json_response(handler.compute())
+
+    assert status_code == 200
+    assert response["request_id"] == workflow_state.request_id
+    assert response["canvas_order_id"] == workflow_state.canvas_order_id
+    assert response["workflow_status"] == "needs_review"
+    assert response["requires_manual_review"] is True
+
+
+def test_get_endpoint_requires_exactly_one_lookup_parameter() -> None:
+    handler = LabOrderWorkflowIntakeEndpoint(
+        event=_build_simple_api_event(
+            method="GET",
+            query_string="request_id=req_lookup&canvas_order_id=ord_lookup",
+        )
+    )
+
+    status_code, response = _parse_json_response(handler.compute())
+
+    assert status_code == 400
+    assert response["error"] == "invalid_request"
+
+
+def test_get_endpoint_returns_not_found_for_unknown_workflow_state() -> None:
+    handler = LabOrderWorkflowIntakeEndpoint(
+        event=_build_simple_api_event(
+            method="GET",
+            query_string="request_id=req_missing",
+        )
+    )
+
+    status_code, response = _parse_json_response(handler.compute())
+
+    assert status_code == 404
+    assert response["error"] == "not_found"

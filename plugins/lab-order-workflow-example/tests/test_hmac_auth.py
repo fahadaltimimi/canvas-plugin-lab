@@ -10,6 +10,7 @@ from canvas_sdk.events import EventType
 from canvas_sdk.handlers.simple_api.exceptions import AuthenticationError
 
 from lab_order_workflow_example.handlers.endpoint_handler import LabOrderWorkflowIntakeEndpoint
+from lab_order_workflow_example.services.hmac_auth import HMACAuthenticationError
 from lab_order_workflow_example.services import (
     HMACCredentials,
     build_canonical_string,
@@ -109,7 +110,7 @@ def test_wrong_body_hash_is_rejected() -> None:
     headers["X-Canvas-Content-SHA256"] = "0" * 64
     request = _build_request(payload, headers=headers)
 
-    with pytest.raises(AuthenticationError):
+    with pytest.raises(HMACAuthenticationError, match="content_hash_mismatch"):
         validate_hmac_credentials(
             HMACCredentials(request),
             DEFAULT_HMAC_SECRETS,
@@ -124,7 +125,7 @@ def test_wrong_signature_is_rejected() -> None:
     headers["X-Canvas-Signature"] = "f" * 64
     request = _build_request(payload, headers=headers)
 
-    with pytest.raises(AuthenticationError):
+    with pytest.raises(HMACAuthenticationError, match="signature_mismatch"):
         validate_hmac_credentials(
             HMACCredentials(request),
             DEFAULT_HMAC_SECRETS,
@@ -140,7 +141,7 @@ def test_expired_timestamp_is_rejected() -> None:
     headers = _build_signed_headers(_json_bytes(payload), timestamp=timestamp)
     request = _build_request(payload, headers=headers)
 
-    with pytest.raises(AuthenticationError):
+    with pytest.raises(HMACAuthenticationError, match="timestamp_outside_allowed_skew"):
         validate_hmac_credentials(
             HMACCredentials(request),
             DEFAULT_HMAC_SECRETS,
@@ -161,9 +162,23 @@ def test_replayed_nonce_is_rejected() -> None:
         consume_replay_nonce=True,
     )
 
-    with pytest.raises(AuthenticationError):
+    with pytest.raises(HMACAuthenticationError, match="replayed_nonce"):
         validate_hmac_credentials(
             credentials,
+            DEFAULT_HMAC_SECRETS,
+            consume_replay_nonce=True,
+        )
+
+
+def test_missing_required_headers_are_rejected() -> None:
+    request = _build_request(
+        {"hello": "world"},
+        headers={"Content-Type": "application/json"},
+    )
+
+    with pytest.raises(HMACAuthenticationError, match="missing_required_headers"):
+        validate_hmac_credentials(
+            HMACCredentials(request),
             DEFAULT_HMAC_SECRETS,
             consume_replay_nonce=True,
         )

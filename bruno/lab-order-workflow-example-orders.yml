@@ -42,7 +42,8 @@ runtime:
           : bru.interpolate(bodyMeta?.data || "");
         const method = (req.getMethod ? req.getMethod() : req.method || "POST").toUpperCase();
         const url = req.getUrl ? req.getUrl() : "";
-        const path = req.getPath ? req.getPath() : new URL(url).pathname;
+        // Canvas passes the route-local Simple API path to the plugin handler.
+        const path = "/lab-order-workflow-example/orders";
         const queryString = req.getQueryString
           ? req.getQueryString()
           : (new URL(url).search || "").replace(/^\?/, "");

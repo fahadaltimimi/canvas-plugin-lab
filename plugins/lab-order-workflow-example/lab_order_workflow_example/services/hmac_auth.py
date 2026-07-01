@@ -30,8 +30,9 @@ DEFAULT_REPLAY_WINDOW_SECONDS = 600
 
 
 class HMACAuthenticationError(AuthenticationError):
-    def __init__(self) -> None:
-        super().__init__("Request authentication failed")
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(f"Request authentication failed: {reason}")
 
 
 @dataclass(frozen=True)
@@ -79,7 +80,7 @@ def validate_hmac_credentials(
     _require_required_headers(credentials)
 
     if not hmac.compare_digest(credentials.client_id.encode(), config.client_id.encode()):
-        raise HMACAuthenticationError()
+        raise HMACAuthenticationError("invalid_client_id")
 
     current_time = now or datetime.now(timezone.utc)
     request_timestamp = _parse_timestamp(credentials.timestamp)
@@ -87,7 +88,7 @@ def validate_hmac_credentials(
 
     computed_content_hash = hashlib.sha256(credentials.request.body).hexdigest()
     if not hmac.compare_digest(credentials.content_sha256.lower(), computed_content_hash):
-        raise HMACAuthenticationError()
+        raise HMACAuthenticationError("content_hash_mismatch")
 
     canonical_string = build_canonical_string(
         method=credentials.request.method,
@@ -104,7 +105,7 @@ def validate_hmac_credentials(
         provided_signature,
         valid_signature,
     ):
-        raise HMACAuthenticationError()
+        raise HMACAuthenticationError("signature_mismatch")
 
     purge_expired_nonces(DEFAULT_REPLAY_WINDOW_SECONDS, now=current_time)
     if consume_replay_nonce and not consume_nonce(
@@ -112,7 +113,7 @@ def validate_hmac_credentials(
         nonce=credentials.nonce,
         request_timestamp=request_timestamp,
     ):
-        raise HMACAuthenticationError()
+        raise HMACAuthenticationError("replayed_nonce")
 
 
 def build_canonical_string(
@@ -156,17 +157,17 @@ def _require_required_headers(credentials: HMACCredentials) -> None:
             credentials.signature,
         ]
     ):
-        raise HMACAuthenticationError()
+        raise HMACAuthenticationError("missing_required_headers")
 
 
 def _parse_timestamp(raw_timestamp: str) -> datetime:
     try:
         parsed_timestamp = datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00"))
     except ValueError as exc:
-        raise HMACAuthenticationError() from exc
+        raise HMACAuthenticationError("invalid_timestamp_format") from exc
 
     if parsed_timestamp.tzinfo is None:
-        raise HMACAuthenticationError()
+        raise HMACAuthenticationError("missing_timestamp_timezone")
 
     return parsed_timestamp.astimezone(timezone.utc)
 
@@ -177,7 +178,7 @@ def _validate_timestamp(
     allowed_skew_seconds: int,
 ) -> None:
     if abs((now - request_timestamp).total_seconds()) > allowed_skew_seconds:
-        raise HMACAuthenticationError()
+        raise HMACAuthenticationError("timestamp_outside_allowed_skew")
 
 
 def _sign_canonical_string(canonical_string: str, secret: str) -> str:
@@ -200,7 +201,7 @@ def _require_secret_string(secrets: dict[str, Any], key: str) -> str:
     value = _optional_secret_string(secrets, key)
     if value is None:
         log.error("Missing required HMAC secret '%s'", key)
-        raise HMACAuthenticationError()
+        raise HMACAuthenticationError(f"missing_configured_secret:{key}")
 
     return value
 

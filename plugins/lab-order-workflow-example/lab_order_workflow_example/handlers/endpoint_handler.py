@@ -32,7 +32,11 @@ class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
     def _authenticate(self) -> list[Effect]:
         try:
             self.authenticate(HMACCredentials(self.request))
-        except AuthenticationError:
+        except AuthenticationError as error:
+            log.info(
+                "[LabOrderWorkflowIntakeEndpoint] SIMPLE_API_AUTHENTICATE rejected request: %s",
+                error,
+            )
             return [
                 JSONResponse(
                     content={"error": "unauthorized"},
@@ -57,8 +61,11 @@ class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
                 self.secrets,
                 consume_replay_nonce=True,
             )
-        except AuthenticationError:
-            log.info("[LabOrderWorkflowIntakeEndpoint] Rejected unauthorized request")
+        except AuthenticationError as error:
+            log.info(
+                "[LabOrderWorkflowIntakeEndpoint] Rejected unauthorized request: %s",
+                error,
+            )
             return [
                 JSONResponse(
                     content={"error": "unauthorized"},

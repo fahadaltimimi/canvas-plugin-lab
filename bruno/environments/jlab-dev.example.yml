@@ -1,0 +1,45 @@
+name: jlab-dev
+variables:
+  - name: CANVAS_BASE_URL
+    value: https://jlab-dev.canvasmedical.com
+  - name: HMAC_CLIENT_ID
+    value: purchase-flow-dev
+  - name: HMAC_SHARED_SECRET
+    value: ""
+    secret: true
+  - name: EXTERNAL_CHECKOUT_ID
+    value: chk_example_001
+  - name: CANVAS_PATIENT_ID
+    value: ""
+  - name: PATIENT_FIRST_NAME
+    value: Jane
+  - name: PATIENT_LAST_NAME
+    value: Doe
+  - name: PATIENT_DOB
+    value: 1990-01-01
+  - name: NOTE_UUID
+    value: ""
+  - name: NOTE_TYPE_SYSTEM
+    value: https://jscreen.org/fhir/CodeSystem/note-types
+  - name: NOTE_TYPE_CODE
+    value: genetic-test-order-review
+  - name: PROVIDER_ID
+    value: ""
+  - name: PRACTICE_LOCATION_ID
+    value: ""
+  - name: NOTE_TITLE
+    value: Genetic test order review
+  - name: LAB_PARTNER
+    value: Generic Lab
+  - name: TEST_ORDER_CODES_JSON
+    value: '["INT03"]'
+  - name: SCREENING_TYPE
+    value: ecs
+  - name: TEST_CODE
+    value: ECS_STANDARD
+  - name: ASHKENAZI_JEWISH_ANCESTRY
+    value: "false"
+  - name: REQUIRES_MANUAL_REVIEW
+    value: "true"
+  - name: SUBMITTED_AT
+    value: 2026-07-01T10:00:00Z

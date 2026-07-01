@@ -20,8 +20,6 @@ downstream handoff should proceed.
 ## Endpoint
 
 - `POST /lab-order-workflow-example/orders`
-- `GET /lab-order-workflow-example/orders?request_id=<id>`
-- `GET /lab-order-workflow-example/orders?canvas_order_id=<id>`
 
 The request uses a simplified genetic-screening payload with patient identity,
 screening type, test code, and whether manual review is required. It accepts
@@ -38,8 +36,24 @@ Canvas note type internally and rejects missing or ambiguous matches with a
 The request also requires real `test_order_codes` and defaults `lab_partner` to
 `Generic Lab` when omitted.
 
-The temporary GET endpoint is for learning and UAT. It returns the stored
-workflow row when exactly one lookup parameter is provided.
+The intake endpoint requires HMAC-signed server-to-server headers:
+
+- `X-Canvas-Client-Id`
+- `X-Canvas-Timestamp`
+- `X-Canvas-Nonce`
+- `X-Canvas-Content-SHA256`
+- `X-Canvas-Signature`
+
+The plugin reads its auth config from Canvas plugin secrets:
+
+- `simpleapi-hmac-client-id`
+- `simpleapi-hmac-shared-secret`
+- `simpleapi-hmac-previous-shared-secret` (optional)
+- `simpleapi-hmac-allowed-skew-seconds` (optional, default `300`)
+- `simpleapi-hmac-replay-window-seconds` (optional, default `600`)
+
+Replay protection is enforced with a plugin-backed nonce store. The plugin no
+longer exposes a public/debug read endpoint for workflow inspection.
 
 ## Workflow Statuses
 
@@ -59,5 +73,7 @@ order state is `sent`.
 
 - This plugin does not originate a real downstream shipment.
 - This plugin does not implement questionnaire syncing or consent storage.
+- Bruno request examples live under `/Users/fahad/Documents/Dev/canvas-plugin-lab/bruno`
+  and are designed to use environment files plus request-time HMAC signing.
 - The manifest controls which handlers Canvas loads; update
   `CANVAS_MANIFEST.json` if handler class paths change.

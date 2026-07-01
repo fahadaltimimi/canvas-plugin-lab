@@ -8,6 +8,10 @@ Canvas Simple API endpoint, optionally creates a dedicated Canvas review note,
 originates a real Canvas lab-order command, tracks workflow state, and records
 when the related Canvas order reaches `sent`.
 
+The intake endpoint is intended to be callable only by an authenticated
+external purchase-flow backend. It uses HMAC-signed server-to-server requests,
+rejects replayed nonces, and does not expose a debug/read HTTP route.
+
 This example intentionally stops at the Canvas-side boundary. It does not
 implement downstream shipment release, Clarity LIMS, DNA Genotek, questionnaire
 sync, or consent/document handling.
@@ -37,17 +41,16 @@ For the current `jlab-dev` instance, the plugin may default `lab_partner` to
 
 The plugin:
 
-1. validates the request payload
-2. maps the payload into a note-and-order workflow input
-3. uses the supplied `note_uuid`, or creates a dedicated Canvas review note
-4. originates a real Canvas lab order on that note
-5. creates a tracked workflow state row
-6. sets the initial workflow status:
+1. authenticates the caller using an HMAC-signed request contract
+2. validates the request payload
+3. maps the payload into a note-and-order workflow input
+4. uses the supplied `note_uuid`, or creates a dedicated Canvas review note
+5. originates a real Canvas lab order on that note
+6. creates a tracked workflow state row
+7. sets the initial workflow status:
    - `needs_review` when manual review is required
    - `ready_to_send` when the example treats the request as auto-approvable
-7. returns a structured JSON response with identifiers and current state
-8. exposes a temporary read endpoint so instance testing can inspect stored
-   workflow state by `request_id` or `canvas_order_id`
+8. returns a structured JSON response with identifiers and current state
 9. stamps the request ID into the lab-order comment so later Canvas events can
    be reconciled back to the purchase request
 10. listens for the related Canvas lab order to become `sent`
@@ -60,11 +63,7 @@ The plugin:
 
 - custom HTTP endpoint exposed by a Canvas Simple API handler
 - intended caller: an external purchase-flow application
-
-### Validation Trigger
-
-- custom HTTP read endpoint exposed by the same Canvas Simple API handler
-- intended caller: developer/UAT validation during learning and debugging
+- requires authenticated server-to-server HMAC headers
 
 ### Canvas-Side Follow-Up Trigger
 
@@ -99,6 +98,16 @@ The plugin:
 }
 ```
 
+## Example Authentication Headers
+
+```text
+X-Canvas-Client-Id: purchase-flow-dev
+X-Canvas-Timestamp: 2026-07-01T18:30:00Z
+X-Canvas-Nonce: 6d6f3f3e-f0a4-4d51-987f-33c9b81ab2f0
+X-Canvas-Content-SHA256: 8e7d...raw-body-sha256...
+X-Canvas-Signature: 9d2a...hmac-sha256...
+```
+
 ## Example Response Payload
 
 ```json
@@ -109,26 +118,6 @@ The plugin:
   "workflow_status": "ready_to_send",
   "next_action": "await_canvas_send",
   "note_uuid": "6bb7d9d8-6e9d-4c6e-8c0b-7f4f1f17d2d1"
-}
-```
-
-## Example Read Response Payload
-
-```json
-{
-  "request_id": "req_123",
-  "external_checkout_id": "chk_123",
-  "canvas_patient_id": "pat_123",
-  "note_uuid": "6bb7d9d8-6e9d-4c6e-8c0b-7f4f1f17d2d1",
-  "canvas_order_id": "ord_456",
-  "command_uuid": "cmd_123",
-  "lab_partner": "Generic Lab",
-  "test_order_codes": ["INT03"],
-  "screening_type": "ecs",
-  "test_code": "ECS_STANDARD",
-  "requires_manual_review": false,
-  "workflow_status": "ready_to_send",
-  "sent_at": null
 }
 ```
 
@@ -147,6 +136,114 @@ The plugin:
 - `requires_manual_review`
 - `workflow_status`
 - `sent_at`
+
+## Endpoint Authentication
+
+The production-style intake path should use HMAC-signed server-to-server
+authentication rather than open access, Canvas browser session auth, or a
+simple reusable API key.
+
+### Why This Is The Chosen Approach
+
+- the caller is an external backend service, not a logged-in Canvas user
+- the request carries structured patient and order data
+- the plugin should validate both caller identity and request integrity
+- the plugin should reject replayed requests
+- the design should not require OAuth or Canvas platform changes
+
+### Authentication Contract
+
+The caller sends these headers on every authenticated request:
+
+- `X-Canvas-Client-Id`
+- `X-Canvas-Timestamp`
+- `X-Canvas-Nonce`
+- `X-Canvas-Content-SHA256`
+- `X-Canvas-Signature`
+
+The plugin stores the shared secret in Canvas plugin secrets.
+
+For the first implementation, assume one external caller per environment:
+
+- `simpleapi-hmac-client-id`
+- `simpleapi-hmac-shared-secret`
+- optional `simpleapi-hmac-previous-shared-secret` for rotation
+
+### Canonical String
+
+The caller computes:
+
+1. `content_sha256` as the lowercase hex SHA-256 of the raw request body bytes
+2. `canonical_target` as:
+   - the request path for requests without a query string
+   - the request path plus the exact query string for requests with one
+3. `signature_input` as the following newline-delimited string:
+
+```text
+<HTTP_METHOD>
+<CANONICAL_TARGET>
+<X-Canvas-Timestamp>
+<X-Canvas-Nonce>
+<X-Canvas-Content-SHA256>
+```
+
+4. `X-Canvas-Signature` as the lowercase hex HMAC-SHA256 of
+   `signature_input`, keyed by the shared secret
+
+### Verification Rules
+
+The plugin must:
+
+1. require all HMAC headers
+2. verify `X-Canvas-Client-Id` matches the configured client id
+3. recompute the raw-body SHA-256 and compare it to
+   `X-Canvas-Content-SHA256`
+4. recompute the HMAC signature and compare it in constant time
+5. reject requests outside the allowed clock-skew window
+6. reject replayed nonces inside the replay-protection window
+
+Recommended defaults:
+
+- allowed clock skew: 5 minutes
+- nonce replay window: 10 minutes
+
+### Replay Protection
+
+The plugin should persist the tuple:
+
+- `client_id`
+- `nonce`
+- `timestamp`
+- `seen_at`
+
+Any repeated nonce for the same client id inside the replay window must be
+rejected.
+
+For this learning plugin, a small plugin-backed cache keyed by
+`client_id + nonce` is acceptable. Production durability or a more formal
+distributed-cache design is out of scope.
+
+### Environment Behavior
+
+- `POST /lab-order-workflow-example/orders` must require HMAC auth
+- the plugin must not expose a public/debug workflow read endpoint
+
+### Error Behavior
+
+Authentication failures return:
+
+- `401 unauthorized` for missing, malformed, expired, replayed, or invalid HMAC
+  credentials
+- a structured JSON error body that does not leak the shared secret or the
+  computed signature
+
+Example error shape:
+
+```json
+{
+  "error": "unauthorized"
+}
+```
 
 ## Note Resolution
 
@@ -200,6 +297,8 @@ endpoint returns. The plugin therefore:
 
 - This is a teaching plugin, not a production integration.
 - The payload shape is simplified and uses genetic-screening-flavored terms.
+- the unauthenticated endpoint behavior is no longer acceptable for the
+  purchase-flow use case
 - the caller must provide either `note_uuid` or `note_creation`
 - `test_order_codes` is required because the instance has many configured lab
   tests and there is no single safe default test.
@@ -215,14 +314,56 @@ endpoint returns. The plugin therefore:
 ## Implementation Shape
 
 - one workflow-scoped plugin: `lab-order-workflow-example`
-- one Simple API endpoint for intake
-- one temporary Simple API read endpoint for workflow-state inspection
+- one HMAC-protected Simple API endpoint for intake
 - one lab-order state handler for `sent` tracking
 - one small custom-data namespace for durable example state
 - one custom model for the tracked workflow row
+- one small replay-protection store for seen nonces
 - optional review-note creation via `Note(...).create()`
 - real Canvas lab-order origination via `LabOrderCommand`
 - request-ID correlation via the lab-order comment
+
+## Bruno Tooling Update
+
+The Bruno collection under `/Users/fahad/Documents/Dev/canvas-plugin-lab/bruno`
+must be updated alongside the auth change.
+
+Required changes:
+
+- remove the assumption that requests are open or only use inherited auth
+- add the HMAC header set to the POST request examples
+- move shared values into Bruno environment variables where possible:
+  - `CANVAS_BASE_URL`
+  - `HMAC_CLIENT_ID`
+  - `HMAC_SHARED_SECRET`
+  - `EXTERNAL_CHECKOUT_ID`
+  - `CANVAS_PATIENT_ID`
+  - `PATIENT_FIRST_NAME`
+  - `PATIENT_LAST_NAME`
+  - `PATIENT_DOB`
+  - `NOTE_TYPE_SYSTEM`
+  - `NOTE_TYPE_CODE`
+  - `PROVIDER_ID`
+  - `PRACTICE_LOCATION_ID`
+  - `NOTE_TITLE`
+  - `LAB_PARTNER`
+  - `TEST_ORDER_CODES_JSON`
+  - `SCREENING_TYPE`
+  - `TEST_CODE`
+  - `ASHKENAZI_JEWISH_ANCESTRY`
+  - `REQUIRES_MANUAL_REVIEW`
+  - `SUBMITTED_AT`
+- if Bruno scripting is used, compute:
+  - timestamp
+  - nonce
+  - raw-body SHA-256
+  - canonical target
+  - HMAC signature
+- remove the debug GET request from the collection
+- add an example Bruno environment template to the repo, not real secrets
+
+The Bruno collection should remain a UAT tool only. It must never contain real
+production secrets.
 
 ## Acceptance Criteria
 
@@ -230,6 +371,10 @@ endpoint returns. The plugin therefore:
   with `ready_to_send`.
 - A valid payload requiring manual review returns a 200 response and creates
   tracked workflow state with `needs_review`.
+- A POST request without valid HMAC authentication returns `401`.
+- A request with an expired timestamp returns `401`.
+- A request with a reused nonce inside the replay window returns `401`.
+- A request with a mismatched body hash or signature returns `401`.
 - A valid payload must include either `note_uuid` or `note_creation`.
 - A valid payload must include `test_order_codes`.
 - If `note_creation` is used, it must include at least one of
@@ -247,9 +392,8 @@ endpoint returns. The plugin therefore:
   tracked workflow row and records `sent_at`.
 - A `LAB_ORDER_UPDATED` event for an unknown order is handled safely and does
   not crash.
-- A GET request with either `request_id` or `canvas_order_id` returns the
-  current tracked workflow row.
-- A GET request with neither or both lookup parameters returns a 400 response.
-- A GET request for an unknown workflow row returns a 404 response.
+- No public/debug workflow-state read endpoint is exposed.
+- The Bruno request examples include authenticated request headers or a Bruno
+  mechanism for computing them.
 - The plugin documentation states clearly that downstream shipment release is
   out of scope for this example.

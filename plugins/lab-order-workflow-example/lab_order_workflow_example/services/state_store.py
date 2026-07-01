@@ -1,7 +1,9 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from lab_order_workflow_example.models import LabOrderWorkflowState, WorkflowStatus
+from django.db import IntegrityError
+
+from lab_order_workflow_example.models import HMACNonceRecord, LabOrderWorkflowState, WorkflowStatus
 from lab_order_workflow_example.services.payload_mapper import MappedLabOrderRequest
 
 
@@ -89,3 +91,31 @@ def mark_as_sent(canvas_order_id: str) -> LabOrderWorkflowState | None:
         WorkflowStatus.SENT,
         sent_at=datetime.now(timezone.utc),
     )
+
+
+def purge_expired_nonces(
+    replay_window_seconds: int,
+    *,
+    now: datetime | None = None,
+) -> None:
+    current_time = now or datetime.now(timezone.utc)
+    cutoff = current_time - timedelta(seconds=replay_window_seconds)
+    HMACNonceRecord.objects.filter(seen_at__lt=cutoff).delete()
+
+
+def consume_nonce(
+    *,
+    client_id: str,
+    nonce: str,
+    request_timestamp: datetime,
+) -> bool:
+    try:
+        HMACNonceRecord.objects.create(
+            client_id=client_id,
+            nonce=nonce,
+            request_timestamp=request_timestamp,
+        )
+    except IntegrityError:
+        return False
+
+    return True

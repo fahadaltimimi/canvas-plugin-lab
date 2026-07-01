@@ -1,68 +1,71 @@
+import json
 from http import HTTPStatus
 
-from canvas_sdk.effects import Effect
+from canvas_sdk.effects import Effect, EffectType
 from canvas_sdk.effects.simple_api import JSONResponse
-from canvas_sdk.handlers.simple_api import Credentials, SimpleAPIRoute
+from canvas_sdk.handlers.simple_api import SimpleAPIRoute
+from canvas_sdk.handlers.simple_api.exceptions import AuthenticationError
 from logger import log
 
-from lab_order_workflow_example.models import LabOrderWorkflowState
 from lab_order_workflow_example.services import (
+    HMACCredentials,
     InvalidPayloadError,
-    find_by_canvas_order_id,
-    find_by_request_id,
     map_checkout_payload,
     next_action_for_status,
     start_workflow,
+    validate_hmac_credentials,
+    validate_hmac_request,
 )
 
 
 class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
     PATH = "/lab-order-workflow-example/orders"
 
-    def authenticate(self, credentials: Credentials) -> bool:
+    def authenticate(self, credentials: HMACCredentials) -> bool:
+        validate_hmac_credentials(
+            credentials,
+            self.secrets,
+            consume_replay_nonce=False,
+        )
         return True
 
-    def get(self) -> list[JSONResponse | Effect]:
-        request_id = _normalize_lookup_value(self.request.query_params.get("request_id"))
-        canvas_order_id = _normalize_lookup_value(self.request.query_params.get("canvas_order_id"))
-
-        if (request_id is None) == (canvas_order_id is None):
+    def _authenticate(self) -> list[Effect]:
+        try:
+            self.authenticate(HMACCredentials(self.request))
+        except AuthenticationError:
             return [
                 JSONResponse(
-                    content={
-                        "error": "invalid_request",
-                        "details": [
-                            {
-                                "field": "request_id|canvas_order_id",
-                                "message": "provide exactly one lookup parameter",
-                            }
-                        ],
-                    },
-                    status_code=HTTPStatus.BAD_REQUEST,
-                )
+                    content={"error": "unauthorized"},
+                    status_code=HTTPStatus.UNAUTHORIZED,
+                ).apply()
             ]
 
-        workflow_state = (
-            find_by_request_id(request_id)
-            if request_id is not None
-            else find_by_canvas_order_id(canvas_order_id)
-        )
-        if workflow_state is None:
-            return [
-                JSONResponse(
-                    content={"error": "not_found"},
-                    status_code=HTTPStatus.NOT_FOUND,
-                )
-            ]
-
-        return [
-            JSONResponse(
-                content=_serialize_workflow_state(workflow_state),
-                status_code=HTTPStatus.OK,
-            )
-        ]
+        payload = {
+            "headers": {},
+            "body": "",
+            "status_code": int(HTTPStatus.OK),
+            "handling_options": {
+                "file_uploads": getattr(self._handler, "file_uploads", "passthrough"),
+            },
+        }
+        return [Effect(type=EffectType.SIMPLE_API_RESPONSE, payload=json.dumps(payload))]
 
     def post(self) -> list[JSONResponse | Effect]:
+        try:
+            validate_hmac_request(
+                self.request,
+                self.secrets,
+                consume_replay_nonce=True,
+            )
+        except AuthenticationError:
+            log.info("[LabOrderWorkflowIntakeEndpoint] Rejected unauthorized request")
+            return [
+                JSONResponse(
+                    content={"error": "unauthorized"},
+                    status_code=HTTPStatus.UNAUTHORIZED,
+                )
+            ]
+
         try:
             mapped_payload = map_checkout_payload(self.request.json())
             workflow_state, workflow_effects = start_workflow(mapped_payload)
@@ -80,14 +83,14 @@ class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
                     status_code=HTTPStatus.BAD_REQUEST,
                 )
             ]
-
-        log.info(
-            "[LabOrderWorkflowIntakeEndpoint] Created workflow request_id=%s note_uuid=%s canvas_order_id=%s status=%s",
-            workflow_state.request_id,
-            workflow_state.note_uuid,
-            workflow_state.canvas_order_id,
-            workflow_state.workflow_status,
-        )
+        else:
+            log.info(
+                "[LabOrderWorkflowIntakeEndpoint] Created workflow request_id=%s note_uuid=%s canvas_order_id=%s status=%s",
+                workflow_state.request_id,
+                workflow_state.note_uuid,
+                workflow_state.canvas_order_id,
+                workflow_state.workflow_status,
+            )
 
         return [
             *workflow_effects,
@@ -103,29 +106,3 @@ class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
                 status_code=HTTPStatus.OK,
             )
         ]
-
-
-def _normalize_lookup_value(value) -> str | None:
-    if not isinstance(value, str):
-        return None
-
-    normalized = value.strip()
-    return normalized or None
-
-
-def _serialize_workflow_state(workflow_state: LabOrderWorkflowState) -> dict:
-    return {
-        "request_id": workflow_state.request_id,
-        "external_checkout_id": workflow_state.external_checkout_id,
-        "canvas_patient_id": workflow_state.canvas_patient_id,
-        "note_uuid": workflow_state.note_uuid,
-        "canvas_order_id": workflow_state.canvas_order_id,
-        "command_uuid": workflow_state.command_uuid,
-        "lab_partner": workflow_state.lab_partner,
-        "test_order_codes": workflow_state.test_order_codes,
-        "screening_type": workflow_state.screening_type,
-        "test_code": workflow_state.test_code,
-        "requires_manual_review": workflow_state.requires_manual_review,
-        "workflow_status": workflow_state.workflow_status,
-        "sent_at": workflow_state.sent_at.isoformat() if workflow_state.sent_at else None,
-    }

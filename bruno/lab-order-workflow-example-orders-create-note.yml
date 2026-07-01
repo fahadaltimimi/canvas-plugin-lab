@@ -5,45 +5,78 @@ info:
 
 http:
   method: POST
-  url: https://jlab-dev.canvasmedical.com/plugin-io/api/lab_order_workflow_example/lab-order-workflow-example/orders
+  url: "{{CANVAS_BASE_URL}}/plugin-io/api/lab_order_workflow_example/lab-order-workflow-example/orders"
+  headers:
+    - name: Content-Type
+      value: application/json
   body:
     type: json
     data: |-
       {
-        "external_checkout_id": "chk_create_note_001",
+        "external_checkout_id": "{{EXTERNAL_CHECKOUT_ID}}",
         "patient": {
-          "canvas_patient_id": "REPLACE_WITH_PATIENT_UUID",
-          "first_name": "Jane",
-          "last_name": "Doe",
-          "dob": "1990-01-01"
+          "canvas_patient_id": "{{CANVAS_PATIENT_ID}}",
+          "first_name": "{{PATIENT_FIRST_NAME}}",
+          "last_name": "{{PATIENT_LAST_NAME}}",
+          "dob": "{{PATIENT_DOB}}"
         },
         "note_creation": {
-          "note_type_system": "https://jscreen.org/fhir/CodeSystem/note-types",
-          "note_type_code": "genetic-test-order-review",
-          "provider_id": "REPLACE_WITH_PROVIDER_STAFF_UUID",
-          "practice_location_id": "REPLACE_WITH_PRACTICE_LOCATION_UUID",
-          "title": "Genetic test order review"
+          "note_type_system": "{{NOTE_TYPE_SYSTEM}}",
+          "note_type_code": "{{NOTE_TYPE_CODE}}",
+          "provider_id": "{{PROVIDER_ID}}",
+          "practice_location_id": "{{PRACTICE_LOCATION_ID}}",
+          "title": "{{NOTE_TITLE}}"
         },
-        "lab_partner": "Generic Lab",
-        "test_order_codes": [
-          "INT03"
-        ],
-        "screening_type": "ecs",
-        "test_code": "ECS_STANDARD",
-        "ashkenazi_jewish_ancestry": false,
-        "requires_manual_review": true,
-        "submitted_at": "2026-07-01T10:00:00Z"
+        "lab_partner": "{{LAB_PARTNER}}",
+        "test_order_codes": {{TEST_ORDER_CODES_JSON}},
+        "screening_type": "{{SCREENING_TYPE}}",
+        "test_code": "{{TEST_CODE}}",
+        "ashkenazi_jewish_ancestry": {{ASHKENAZI_JEWISH_ANCESTRY}},
+        "requires_manual_review": {{REQUIRES_MANUAL_REVIEW}},
+        "submitted_at": "{{SUBMITTED_AT}}"
       }
-  auth: inherit
 
-meta:
-  notes: |-
-    This request exercises the create-note path before lab-order origination.
-    The new note type was created with:
-    - system: https://jscreen.org/fhir/CodeSystem/note-types
-    - code: genetic-test-order-review
-    The plugin now resolves the active Canvas note type internally from those
-    fields, so the request no longer needs the Canvas NoteType UUID.
+runtime:
+  scripts:
+    - type: pre-request
+      content: |
+        const crypto = require("crypto");
+
+        const bodyMeta = req.getBody ? req.getBody() : req.body;
+        const rawBody = typeof bodyMeta === "string"
+          ? bru.interpolate(bodyMeta)
+          : bru.interpolate(bodyMeta?.data || "");
+        const method = (req.getMethod ? req.getMethod() : req.method || "POST").toUpperCase();
+        const url = req.getUrl ? req.getUrl() : "";
+        const path = req.getPath ? req.getPath() : new URL(url).pathname;
+        const queryString = req.getQueryString
+          ? req.getQueryString()
+          : (new URL(url).search || "").replace(/^\?/, "");
+        const timestamp = new Date().toISOString();
+        const nonce = crypto.randomUUID
+          ? crypto.randomUUID()
+          : crypto.randomBytes(16).toString("hex");
+        const contentSha256 = crypto.createHash("sha256").update(rawBody).digest("hex");
+        const canonicalTarget = queryString ? `${path}?${queryString}` : path;
+        const canonicalString = [
+          method,
+          canonicalTarget,
+          timestamp,
+          nonce,
+          contentSha256,
+        ].join("\n");
+        const sharedSecret = (bru.getSecretVar && bru.getSecretVar("HMAC_SHARED_SECRET"))
+          || bru.getEnvVar("HMAC_SHARED_SECRET");
+        const signature = crypto
+          .createHmac("sha256", sharedSecret)
+          .update(canonicalString)
+          .digest("hex");
+
+        req.setHeader("X-Canvas-Client-Id", bru.getEnvVar("HMAC_CLIENT_ID"));
+        req.setHeader("X-Canvas-Timestamp", timestamp);
+        req.setHeader("X-Canvas-Nonce", nonce);
+        req.setHeader("X-Canvas-Content-SHA256", contentSha256);
+        req.setHeader("X-Canvas-Signature", signature);
 
 settings:
   encodeUrl: true

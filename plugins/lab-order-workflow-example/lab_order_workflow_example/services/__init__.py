@@ -1,3 +1,9 @@
+from lab_order_workflow_example.services.hmac_auth import (
+    HMACCredentials,
+    build_canonical_string,
+    validate_hmac_credentials,
+    validate_hmac_request,
+)
 from lab_order_workflow_example.services.order_workflow import (
     extract_order_state,
     extract_request_id_from_order_comment,
@@ -18,8 +24,10 @@ from lab_order_workflow_example.services.state_store import (
 
 __all__ = (
     "InvalidPayloadError",
+    "HMACCredentials",
     "MappedLabOrderRequest",
     "NoteCreationContext",
+    "build_canonical_string",
     "extract_order_state",
     "extract_request_id_from_order_comment",
     "find_by_canvas_order_id",
@@ -28,4 +36,6 @@ __all__ = (
     "next_action_for_status",
     "start_workflow",
     "update_workflow_for_canvas_order_event",
+    "validate_hmac_credentials",
+    "validate_hmac_request",
 )

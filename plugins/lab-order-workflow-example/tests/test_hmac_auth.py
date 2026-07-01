@@ -20,8 +20,6 @@ DEFAULT_PATH = "/lab-order-workflow-example/orders"
 DEFAULT_HMAC_SECRETS = {
     "simpleapi-hmac-client-id": "purchase-flow-dev",
     "simpleapi-hmac-shared-secret": "super-secret-value",
-    "simpleapi-hmac-allowed-skew-seconds": "300",
-    "simpleapi-hmac-replay-window-seconds": "600",
 }
 
 
@@ -169,22 +167,3 @@ def test_replayed_nonce_is_rejected() -> None:
             DEFAULT_HMAC_SECRETS,
             consume_replay_nonce=True,
         )
-
-
-def test_previous_secret_is_accepted_when_configured() -> None:
-    payload = {"hello": "world"}
-    timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    headers = _build_signed_headers(
-        _json_bytes(payload),
-        timestamp=timestamp,
-        shared_secret="previous-secret-value",
-    )
-    request = _build_request(payload, headers=headers)
-    secrets = dict(DEFAULT_HMAC_SECRETS)
-    secrets["simpleapi-hmac-previous-shared-secret"] = "previous-secret-value"
-
-    validate_hmac_credentials(
-        HMACCredentials(request),
-        secrets,
-        consume_replay_nonce=True,
-    )

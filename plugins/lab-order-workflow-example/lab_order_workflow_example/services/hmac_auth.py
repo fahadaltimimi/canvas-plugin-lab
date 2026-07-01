@@ -24,9 +24,6 @@ HMAC_SIGNATURE_HEADER = "X-Canvas-Signature"
 
 HMAC_CLIENT_ID_SECRET = "simpleapi-hmac-client-id"
 HMAC_SHARED_SECRET = "simpleapi-hmac-shared-secret"
-HMAC_PREVIOUS_SHARED_SECRET = "simpleapi-hmac-previous-shared-secret"
-HMAC_ALLOWED_SKEW_SECONDS = "simpleapi-hmac-allowed-skew-seconds"
-HMAC_REPLAY_WINDOW_SECONDS = "simpleapi-hmac-replay-window-seconds"
 
 DEFAULT_ALLOWED_SKEW_SECONDS = 300
 DEFAULT_REPLAY_WINDOW_SECONDS = 600
@@ -41,9 +38,6 @@ class HMACAuthenticationError(AuthenticationError):
 class HMACConfig:
     client_id: str
     shared_secret: str
-    previous_shared_secret: str | None
-    allowed_skew_seconds: int
-    replay_window_seconds: int
 
 
 class HMACCredentials(Credentials):
@@ -89,7 +83,7 @@ def validate_hmac_credentials(
 
     current_time = now or datetime.now(timezone.utc)
     request_timestamp = _parse_timestamp(credentials.timestamp)
-    _validate_timestamp(request_timestamp, current_time, config.allowed_skew_seconds)
+    _validate_timestamp(request_timestamp, current_time, DEFAULT_ALLOWED_SKEW_SECONDS)
 
     computed_content_hash = hashlib.sha256(credentials.request.body).hexdigest()
     if not hmac.compare_digest(credentials.content_sha256.lower(), computed_content_hash):
@@ -104,22 +98,15 @@ def validate_hmac_credentials(
         content_sha256=credentials.content_sha256.lower(),
     )
 
-    valid_signatures = [
-        _sign_canonical_string(canonical_string, config.shared_secret),
-    ]
-    if config.previous_shared_secret:
-        valid_signatures.append(
-            _sign_canonical_string(canonical_string, config.previous_shared_secret)
-        )
-
     provided_signature = credentials.signature.lower()
-    if not any(
-        hmac.compare_digest(provided_signature, valid_signature)
-        for valid_signature in valid_signatures
+    valid_signature = _sign_canonical_string(canonical_string, config.shared_secret)
+    if not hmac.compare_digest(
+        provided_signature,
+        valid_signature,
     ):
         raise HMACAuthenticationError()
 
-    purge_expired_nonces(config.replay_window_seconds, now=current_time)
+    purge_expired_nonces(DEFAULT_REPLAY_WINDOW_SECONDS, now=current_time)
     if consume_replay_nonce and not consume_nonce(
         client_id=credentials.client_id,
         nonce=credentials.nonce,
@@ -156,17 +143,6 @@ def _load_hmac_config(secrets: dict[str, Any]) -> HMACConfig:
     return HMACConfig(
         client_id=_require_secret_string(secrets, HMAC_CLIENT_ID_SECRET),
         shared_secret=_require_secret_string(secrets, HMAC_SHARED_SECRET),
-        previous_shared_secret=_optional_secret_string(secrets, HMAC_PREVIOUS_SHARED_SECRET),
-        allowed_skew_seconds=_parse_positive_int_secret(
-            secrets,
-            HMAC_ALLOWED_SKEW_SECONDS,
-            DEFAULT_ALLOWED_SKEW_SECONDS,
-        ),
-        replay_window_seconds=_parse_positive_int_secret(
-            secrets,
-            HMAC_REPLAY_WINDOW_SECONDS,
-            DEFAULT_REPLAY_WINDOW_SECONDS,
-        ),
     )
 
 
@@ -239,25 +215,3 @@ def _optional_secret_string(secrets: dict[str, Any], key: str) -> str | None:
 
     normalized = value.strip()
     return normalized or None
-
-
-def _parse_positive_int_secret(
-    secrets: dict[str, Any],
-    key: str,
-    default: int,
-) -> int:
-    raw_value = secrets.get(key)
-    if raw_value is None:
-        return default
-
-    try:
-        parsed_value = int(str(raw_value).strip())
-    except ValueError as exc:
-        log.error("Invalid integer value for HMAC secret '%s'", key)
-        raise HMACAuthenticationError() from exc
-
-    if parsed_value <= 0:
-        log.error("HMAC secret '%s' must be a positive integer", key)
-        raise HMACAuthenticationError()
-
-    return parsed_value

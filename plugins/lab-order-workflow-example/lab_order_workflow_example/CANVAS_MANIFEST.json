@@ -23,7 +23,16 @@
         "namespace": "canvaslab__lab_order_workflow_example",
         "access": "read_write"
     },
-    "variables": [],
+    "variables": [
+        {
+            "name": "simpleapi-hmac-client-id",
+            "sensitive": true
+        },
+        {
+            "name": "simpleapi-hmac-shared-secret",
+            "sensitive": true
+        }
+    ],
     "tags": {},
     "references": [],
     "license": "",

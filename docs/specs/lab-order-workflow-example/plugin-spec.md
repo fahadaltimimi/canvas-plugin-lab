@@ -167,7 +167,11 @@ For the first implementation, assume one external caller per environment:
 
 - `simpleapi-hmac-client-id`
 - `simpleapi-hmac-shared-secret`
-- optional `simpleapi-hmac-previous-shared-secret` for rotation
+
+This example intentionally exposes only those two plugin secrets in Canvas
+admin. Secret rotation support is out of scope for v1 and would require either
+a brief coordinated cutover or a future enhancement to reintroduce dual-secret
+validation.
 
 ### Canonical String
 
@@ -206,6 +210,9 @@ Recommended defaults:
 
 - allowed clock skew: 5 minutes
 - nonce replay window: 10 minutes
+
+These are fixed code defaults in the example, not plugin-configurable Canvas
+secrets.
 
 ### Replay Protection
 

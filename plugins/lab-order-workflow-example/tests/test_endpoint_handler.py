@@ -17,8 +17,6 @@ DEFAULT_PATH = "/lab-order-workflow-example/orders"
 DEFAULT_HMAC_SECRETS = {
     "simpleapi-hmac-client-id": "purchase-flow-dev",
     "simpleapi-hmac-shared-secret": "super-secret-value",
-    "simpleapi-hmac-allowed-skew-seconds": "300",
-    "simpleapi-hmac-replay-window-seconds": "600",
 }
 
 

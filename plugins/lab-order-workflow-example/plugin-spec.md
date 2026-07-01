@@ -21,6 +21,7 @@ lab-order workflow:
 - listen for the related Canvas lab order to become `sent`
 - add replay protection for signed machine-to-machine requests
 - update the Bruno collection to send authenticated requests
+- expose only the two required HMAC plugin secrets in Canvas admin
 - stop at the Canvas-side boundary
 
 Out of scope:

@@ -48,12 +48,11 @@ The plugin reads its auth config from Canvas plugin secrets:
 
 - `simpleapi-hmac-client-id`
 - `simpleapi-hmac-shared-secret`
-- `simpleapi-hmac-previous-shared-secret` (optional)
-- `simpleapi-hmac-allowed-skew-seconds` (optional, default `300`)
-- `simpleapi-hmac-replay-window-seconds` (optional, default `600`)
 
-Replay protection is enforced with a plugin-backed nonce store. The plugin no
-longer exposes a public/debug read endpoint for workflow inspection.
+Replay protection is enforced with a plugin-backed nonce store. The plugin
+uses built-in defaults of `300` seconds for allowed clock skew and `600`
+seconds for the nonce replay window. The plugin no longer exposes a
+public/debug read endpoint for workflow inspection.
 
 ## Workflow Statuses
 

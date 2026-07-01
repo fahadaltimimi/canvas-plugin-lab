@@ -30,6 +30,11 @@ either:
 - `note_uuid` for an existing Canvas note
 - `note_creation` so the plugin can create a dedicated review note
 
+When `note_creation` is used, the caller supplies note-type identity by
+`note_type_system` and/or `note_type_code`. The plugin resolves the active
+Canvas note type internally and rejects missing or ambiguous matches with a
+`400` response. Providing both fields is the recommended request shape.
+
 The request also requires real `test_order_codes` and defaults `lab_partner` to
 `Generic Lab` when omitted.
 

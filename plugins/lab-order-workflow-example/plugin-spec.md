@@ -9,6 +9,8 @@ lab-order workflow:
 - require either `note_uuid` or `note_creation`, plus real `test_order_codes`
 - default `lab_partner` to `Generic Lab` on the current instance unless
   explicitly overridden
+- resolve `note_creation` note types by `note_type_system` and/or
+  `note_type_code` instead of requiring a NoteType UUID from the caller
 - optionally create a dedicated review note for purchase-flow intake
 - originate a real Canvas lab-order command on the resolved Canvas note
 - expose a temporary read endpoint for workflow-state inspection

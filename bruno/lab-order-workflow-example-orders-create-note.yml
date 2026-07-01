@@ -18,7 +18,8 @@ http:
           "dob": "1990-01-01"
         },
         "note_creation": {
-          "note_type_id": "REPLACE_WITH_NOTE_TYPE_UUID_FOR_GENETIC_TEST_ORDER_REVIEW",
+          "note_type_system": "https://jscreen.org/fhir/CodeSystem/note-types",
+          "note_type_code": "genetic-test-order-review",
           "provider_id": "REPLACE_WITH_PROVIDER_STAFF_UUID",
           "practice_location_id": "REPLACE_WITH_PRACTICE_LOCATION_UUID",
           "title": "Genetic test order review"
@@ -41,10 +42,8 @@ meta:
     The new note type was created with:
     - system: https://jscreen.org/fhir/CodeSystem/note-types
     - code: genetic-test-order-review
-
-    The current plugin implementation still requires note_creation.note_type_id,
-    which must be the Canvas NoteType UUID, not the Django admin row id in
-    /admin/api/notetype/<row-id>/change/.
+    The plugin now resolves the active Canvas note type internally from those
+    fields, so the request no longer needs the Canvas NoteType UUID.
 
 settings:
   encodeUrl: true

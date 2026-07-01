@@ -62,12 +62,45 @@ class _FakeLabOrderCommand:
         return Effect(type="ORIGINATE_LAB_ORDER_COMMAND", payload="{}")
 
 
+class _FakeNoteTypeQuerySet:
+    def __init__(self, matches: list[dict]) -> None:
+        self.matches = matches
+
+    def values(self, *_args) -> list[dict]:
+        return list(self.matches)
+
+
+class _FakeNoteTypeManager:
+    matches: list[dict] = []
+
+    def filter(self, **filters) -> _FakeNoteTypeQuerySet:
+        filtered_matches = []
+        for match in type(self).matches:
+            if all(match.get(key) == value for key, value in filters.items()):
+                filtered_matches.append(match)
+        return _FakeNoteTypeQuerySet(filtered_matches)
+
+
+class _FakeNoteType:
+    objects = _FakeNoteTypeManager()
+
+
 @pytest.fixture(autouse=True)
 def _stub_canvas_effect_builders(monkeypatch: pytest.MonkeyPatch) -> None:
     _FakeNote.calls = []
     _FakeLabOrderCommand.calls = []
+    _FakeNoteTypeManager.matches = [
+        {
+            "id": "nt_review_uuid",
+            "system": "https://jscreen.org/fhir/CodeSystem/note-types",
+            "code": "genetic-test-order-review",
+            "name": "Genetic Test Order Review",
+            "is_active": True,
+        }
+    ]
     monkeypatch.setattr(order_workflow, "Note", _FakeNote)
     monkeypatch.setattr(order_workflow, "LabOrderCommand", _FakeLabOrderCommand)
+    monkeypatch.setattr(order_workflow, "NoteType", _FakeNoteType)
 
 
 def test_endpoint_creates_note_and_ready_to_send_workflow_state() -> None:
@@ -80,7 +113,8 @@ def test_endpoint_creates_note_and_ready_to_send_workflow_state() -> None:
             "dob": "1990-01-01",
         },
         "note_creation": {
-            "note_type_id": "nt_review",
+            "note_type_system": "https://jscreen.org/fhir/CodeSystem/note-types",
+            "note_type_code": "genetic-test-order-review",
             "provider_id": "staff_gc",
             "practice_location_id": "pl_main",
             "title": "Genetic test order review",
@@ -109,6 +143,7 @@ def test_endpoint_creates_note_and_ready_to_send_workflow_state() -> None:
 
     assert len(effects) == 3
     assert _FakeNote.calls[0]["instance_id"] == workflow_state.note_uuid
+    assert _FakeNote.calls[0]["note_type_id"] == "nt_review_uuid"
     assert _FakeLabOrderCommand.calls[0]["note_uuid"] == workflow_state.note_uuid
     assert _FakeLabOrderCommand.calls[0]["tests_order_codes"] == ["INT03"]
     assert _FakeLabOrderCommand.calls[0]["comment"] == f"workflow:{workflow_state.request_id}"
@@ -179,6 +214,59 @@ def test_endpoint_rejects_invalid_payload_without_creating_state() -> None:
 
     assert status_code == 400
     assert response["error"] == "invalid_request"
+    assert LabOrderWorkflowState.objects.count() == 0
+
+
+def test_endpoint_rejects_ambiguous_note_type_resolution_without_creating_state() -> None:
+    _FakeNoteTypeManager.matches = [
+        {
+            "id": "nt_review_uuid_a",
+            "system": "https://jscreen.org/fhir/CodeSystem/note-types",
+            "code": "genetic-test-order-review",
+            "name": "Genetic Test Order Review A",
+            "is_active": True,
+        },
+        {
+            "id": "nt_review_uuid_b",
+            "system": "https://other.example/fhir/CodeSystem/note-types",
+            "code": "genetic-test-order-review",
+            "name": "Genetic Test Order Review B",
+            "is_active": True,
+        },
+    ]
+    payload = {
+        "external_checkout_id": "chk_ambiguous_123",
+        "patient": {
+            "canvas_patient_id": "pat_123",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "dob": "1990-01-01",
+        },
+        "note_creation": {
+            "note_type_code": "genetic-test-order-review",
+            "provider_id": "staff_gc",
+            "practice_location_id": "pl_main",
+        },
+        "test_order_codes": ["INT03"],
+        "screening_type": "ecs",
+        "test_code": "ECS_STANDARD",
+        "ashkenazi_jewish_ancestry": False,
+        "requires_manual_review": False,
+        "submitted_at": "2026-07-01T10:00:00Z",
+    }
+
+    handler = LabOrderWorkflowIntakeEndpoint(event=_build_simple_api_event(payload))
+
+    status_code, response = _parse_json_response(handler.compute())
+
+    assert status_code == 400
+    assert response["error"] == "invalid_request"
+    assert response["details"] == [
+        {
+            "field": "note_creation.note_type_system|note_creation.note_type_code",
+            "message": "provided note_creation filters matched multiple active Canvas note types",
+        }
+    ]
     assert LabOrderWorkflowState.objects.count() == 0
 
 

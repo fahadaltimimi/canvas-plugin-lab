@@ -83,7 +83,8 @@ The plugin:
     "dob": "1990-01-01"
   },
   "note_creation": {
-    "note_type_id": "note_type_uuid",
+    "note_type_system": "https://jscreen.org/fhir/CodeSystem/note-types",
+    "note_type_code": "genetic-test-order-review",
     "provider_id": "staff_uuid",
     "practice_location_id": "location_uuid",
     "title": "Genetic test order review"
@@ -160,11 +161,24 @@ This example supports two paths:
 
 `note_creation` requires:
 
-- `note_type_id`
+- at least one of `note_type_system` or `note_type_code`
 - `provider_id`
 - `practice_location_id`
 - optional `title`
 - optional `supervising_provider_id`
+
+The plugin resolves the actual Canvas `NoteType.id` internally:
+
+1. if both `note_type_system` and `note_type_code` are provided, it resolves an
+   exact active match
+2. if only one is provided, it resolves only when that filter returns exactly
+   one active Canvas note type
+3. if the match is missing or ambiguous, the plugin returns a validation error
+
+For production-style use, the recommended request shape is to provide both
+`note_type_system` and `note_type_code` so the note type is explicit and
+portable across instances without leaking UUIDs into the external purchase
+flow.
 
 For the real purchase-flow use case, the default recommendation is to let the
 plugin create a dedicated review note rather than forcing the external caller to
@@ -218,6 +232,10 @@ endpoint returns. The plugin therefore:
   tracked workflow state with `needs_review`.
 - A valid payload must include either `note_uuid` or `note_creation`.
 - A valid payload must include `test_order_codes`.
+- If `note_creation` is used, it must include at least one of
+  `note_type_system` or `note_type_code`.
+- If `note_creation` resolves zero or multiple active Canvas note types, the
+  plugin returns a 400 response and does not create tracked state.
 - If `lab_partner` is omitted, the plugin defaults it to `Generic Lab` for the
   current instance.
 - If `note_creation` is used, the plugin emits a Canvas note-create effect

@@ -65,6 +65,7 @@ class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
     def post(self) -> list[JSONResponse | Effect]:
         try:
             mapped_payload = map_checkout_payload(self.request.json())
+            workflow_state, workflow_effects = start_workflow(mapped_payload)
         except InvalidPayloadError as error:
             log.info(
                 "[LabOrderWorkflowIntakeEndpoint] Rejected invalid request: %s",
@@ -79,8 +80,6 @@ class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
                     status_code=HTTPStatus.BAD_REQUEST,
                 )
             ]
-
-        workflow_state, workflow_effects = start_workflow(mapped_payload)
 
         log.info(
             "[LabOrderWorkflowIntakeEndpoint] Created workflow request_id=%s note_uuid=%s canvas_order_id=%s status=%s",

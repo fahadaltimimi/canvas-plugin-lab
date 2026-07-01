@@ -3,10 +3,14 @@ from typing import Any
 from canvas_sdk.commands import LabOrderCommand
 from canvas_sdk.effects import Effect
 from canvas_sdk.effects.note import Note
-from canvas_sdk.v1.data import LabOrder
+from canvas_sdk.v1.data import LabOrder, NoteType
 
 from lab_order_workflow_example.models import LabOrderWorkflowState, WorkflowStatus
-from lab_order_workflow_example.services.payload_mapper import MappedLabOrderRequest
+from lab_order_workflow_example.services.payload_mapper import (
+    InvalidPayloadError,
+    MappedLabOrderRequest,
+    NoteCreationContext,
+)
 from lab_order_workflow_example.services.state_store import (
     assign_canvas_order_id,
     create_draft_workflow_state,
@@ -74,9 +78,10 @@ def _build_note_create_effect(payload: MappedLabOrderRequest, note_uuid: str) ->
     assert payload.note_creation_context is not None
 
     title = payload.note_creation_context.title or _default_note_title(payload)
+    note_type_id = resolve_note_type_id(payload.note_creation_context)
     note_effect = Note(
         instance_id=note_uuid,
-        note_type_id=payload.note_creation_context.note_type_id,
+        note_type_id=note_type_id,
         patient_id=payload.canvas_patient_id,
         provider_id=payload.note_creation_context.provider_id,
         practice_location_id=payload.note_creation_context.practice_location_id,
@@ -118,6 +123,44 @@ def _default_note_title(payload: MappedLabOrderRequest) -> str:
 
 def _order_comment_for_request(request_id: str) -> str:
     return f"{ORDER_COMMENT_PREFIX}{request_id}"
+
+
+def resolve_note_type_id(note_creation_context: NoteCreationContext) -> str:
+    matches = list(_find_matching_note_types(note_creation_context))
+
+    if not matches:
+        raise InvalidPayloadError(
+            [
+                {
+                    "field": "note_creation.note_type_system|note_creation.note_type_code",
+                    "message": "no active Canvas note type matched the provided note_creation filters",
+                }
+            ]
+        )
+
+    if len(matches) > 1:
+        raise InvalidPayloadError(
+            [
+                {
+                    "field": "note_creation.note_type_system|note_creation.note_type_code",
+                    "message": "provided note_creation filters matched multiple active Canvas note types",
+                }
+            ]
+        )
+
+    return str(matches[0]["id"])
+
+
+def _find_matching_note_types(note_creation_context: NoteCreationContext) -> list[dict[str, str]]:
+    filters: dict[str, str | bool] = {"is_active": True}
+
+    if note_creation_context.note_type_system is not None:
+        filters["system"] = note_creation_context.note_type_system
+
+    if note_creation_context.note_type_code is not None:
+        filters["code"] = note_creation_context.note_type_code
+
+    return list(NoteType.objects.filter(**filters).values("id", "system", "code", "name"))
 
 
 def extract_request_id_from_order_comment(comment: str | None) -> str | None:

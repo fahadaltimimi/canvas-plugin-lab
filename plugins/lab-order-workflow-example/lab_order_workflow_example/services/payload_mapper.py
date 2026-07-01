@@ -11,7 +11,8 @@ class InvalidPayloadError(ValueError):
 
 @dataclass(frozen=True)
 class NoteCreationContext:
-    note_type_id: str
+    note_type_system: str | None
+    note_type_code: str | None
     provider_id: str
     practice_location_id: str
     title: str | None
@@ -100,8 +101,28 @@ def _require_string_list(value: Any, field_name: str) -> list[str]:
 
 def _map_note_creation_context(value: Any) -> NoteCreationContext:
     context = _require_dict(value, "note_creation")
+    note_type_system = _optional_string(
+        context.get("note_type_system"),
+        "note_creation.note_type_system",
+    )
+    note_type_code = _optional_string(
+        context.get("note_type_code"),
+        "note_creation.note_type_code",
+    )
+
+    if note_type_system is None and note_type_code is None:
+        raise InvalidPayloadError(
+            [
+                {
+                    "field": "note_creation.note_type_system|note_creation.note_type_code",
+                    "message": "provide note_type_system and/or note_type_code",
+                }
+            ]
+        )
+
     return NoteCreationContext(
-        note_type_id=_require_string(context.get("note_type_id"), "note_creation.note_type_id"),
+        note_type_system=note_type_system,
+        note_type_code=note_type_code,
         provider_id=_require_string(context.get("provider_id"), "note_creation.provider_id"),
         practice_location_id=_require_string(
             context.get("practice_location_id"),

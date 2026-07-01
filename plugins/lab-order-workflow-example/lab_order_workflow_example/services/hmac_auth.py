@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
@@ -66,6 +67,7 @@ def validate_hmac_request(
         secrets,
         consume_replay_nonce=consume_replay_nonce,
         now=now,
+        require_body_hash_match=True,
     )
 
 
@@ -75,6 +77,7 @@ def validate_hmac_credentials(
     *,
     consume_replay_nonce: bool,
     now: datetime | None = None,
+    require_body_hash_match: bool = True,
 ) -> None:
     config = _load_hmac_config(secrets)
     _require_required_headers(credentials)
@@ -86,9 +89,29 @@ def validate_hmac_credentials(
     request_timestamp = _parse_timestamp(credentials.timestamp)
     _validate_timestamp(request_timestamp, current_time, DEFAULT_ALLOWED_SKEW_SECONDS)
 
-    computed_content_hash = hashlib.sha256(credentials.request.body).hexdigest()
-    if not hmac.compare_digest(credentials.content_sha256.lower(), computed_content_hash):
-        raise HMACAuthenticationError("content_hash_mismatch")
+    provided_content_hash = credentials.content_sha256.lower()
+    if require_body_hash_match:
+        computed_content_hash = hashlib.sha256(credentials.request.body).hexdigest()
+        normalized_json_hash = _compute_normalized_json_hash(
+            credentials.request.body,
+            credentials.request.content_type,
+        )
+        if not (
+            hmac.compare_digest(provided_content_hash, computed_content_hash)
+            or (
+                normalized_json_hash is not None
+                and hmac.compare_digest(provided_content_hash, normalized_json_hash)
+            )
+        ):
+            log.info(
+                "[HMAC] content hash mismatch provided=%s raw=%s normalized_json=%s body_len=%s content_type=%s",
+                provided_content_hash,
+                computed_content_hash,
+                normalized_json_hash or "n/a",
+                len(credentials.request.body),
+                credentials.request.content_type,
+            )
+            raise HMACAuthenticationError("content_hash_mismatch")
 
     canonical_string = build_canonical_string(
         method=credentials.request.method,
@@ -96,7 +119,7 @@ def validate_hmac_credentials(
         query_string=credentials.request.query_string,
         timestamp=credentials.timestamp,
         nonce=credentials.nonce,
-        content_sha256=credentials.content_sha256.lower(),
+        content_sha256=provided_content_hash,
     )
 
     provided_signature = credentials.signature.lower()
@@ -187,6 +210,19 @@ def _sign_canonical_string(canonical_string: str, secret: str) -> str:
         canonical_string.encode(),
         hashlib.sha256,
     ).hexdigest()
+
+
+def _compute_normalized_json_hash(body: bytes, content_type: str | None) -> str | None:
+    if content_type != "application/json":
+        return None
+
+    try:
+        payload = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
+        return None
+
+    canonical_json = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
+    return hashlib.sha256(canonical_json).hexdigest()
 
 
 def _normalize_header_value(value: Any) -> str | None:

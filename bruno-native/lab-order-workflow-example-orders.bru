@@ -1,0 +1,83 @@
+meta {
+  name: lab-order-workflow-example/orders
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{CANVAS_BASE_URL}}/plugin-io/api/lab_order_workflow_example/lab-order-workflow-example/orders
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "external_checkout_id": "{{EXTERNAL_CHECKOUT_ID}}",
+    "patient": {
+      "canvas_patient_id": "{{CANVAS_PATIENT_ID}}",
+      "first_name": "{{PATIENT_FIRST_NAME}}",
+      "last_name": "{{PATIENT_LAST_NAME}}",
+      "dob": "{{PATIENT_DOB}}"
+    },
+    "note_uuid": "{{NOTE_UUID}}",
+    "lab_partner": "{{LAB_PARTNER}}",
+    "test_order_codes": {{TEST_ORDER_CODES_JSON}},
+    "screening_type": "{{SCREENING_TYPE}}",
+    "test_code": "{{TEST_CODE}}",
+    "ashkenazi_jewish_ancestry": {{ASHKENAZI_JEWISH_ANCESTRY}},
+    "requires_manual_review": {{REQUIRES_MANUAL_REVIEW}},
+    "submitted_at": "{{SUBMITTED_AT}}"
+  }
+}
+
+script:pre-request {
+  const CryptoJS = require("crypto-js");
+  const parseJsonEnv = (name) => JSON.parse(String(bru.getEnvVar(name)));
+  const payload = {
+    external_checkout_id: bru.getEnvVar("EXTERNAL_CHECKOUT_ID"),
+    patient: {
+      canvas_patient_id: bru.getEnvVar("CANVAS_PATIENT_ID"),
+      first_name: bru.getEnvVar("PATIENT_FIRST_NAME"),
+      last_name: bru.getEnvVar("PATIENT_LAST_NAME"),
+      dob: bru.getEnvVar("PATIENT_DOB"),
+    },
+    note_uuid: bru.getEnvVar("NOTE_UUID"),
+    lab_partner: bru.getEnvVar("LAB_PARTNER"),
+    test_order_codes: parseJsonEnv("TEST_ORDER_CODES_JSON"),
+    screening_type: bru.getEnvVar("SCREENING_TYPE"),
+    test_code: bru.getEnvVar("TEST_CODE"),
+    ashkenazi_jewish_ancestry: parseJsonEnv("ASHKENAZI_JEWISH_ANCESTRY"),
+    requires_manual_review: parseJsonEnv("REQUIRES_MANUAL_REVIEW"),
+    submitted_at: bru.getEnvVar("SUBMITTED_AT"),
+  };
+  const rawBody = JSON.stringify(payload);
+  req.setBody(payload);
+  const method = (req.getMethod ? req.getMethod() : req.method || "POST").toUpperCase();
+  const timestamp = new Date().toISOString();
+  const nonce = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
+  const contentSha256 = CryptoJS.SHA256(rawBody).toString(CryptoJS.enc.Hex);
+  const canonicalString = [
+    method,
+    "/lab-order-workflow-example/orders",
+    timestamp,
+    nonce,
+    contentSha256,
+  ].join("\n");
+  const sharedSecret = (bru.getSecretVar && bru.getSecretVar("HMAC_SHARED_SECRET"))
+    || bru.getEnvVar("HMAC_SHARED_SECRET");
+  const signature = CryptoJS.HmacSHA256(canonicalString, sharedSecret).toString(CryptoJS.enc.Hex);
+
+  req.setHeader("X-Canvas-Client-Id", bru.getEnvVar("HMAC_CLIENT_ID"));
+  req.setHeader("X-Canvas-Timestamp", timestamp);
+  req.setHeader("X-Canvas-Nonce", nonce);
+  req.setHeader("X-Canvas-Content-SHA256", contentSha256);
+  req.setHeader("X-Canvas-Signature", signature);
+}
+
+docs {
+  Native Bruno request for the HMAC-protected note_uuid intake path.
+}

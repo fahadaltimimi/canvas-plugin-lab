@@ -252,11 +252,15 @@ def test_endpoint_creates_note_and_ready_to_send_workflow_state() -> None:
 def test_preflight_auth_does_not_consume_nonce_before_request() -> None:
     payload = _create_note_payload()
     shared_event = _build_signed_event(payload, nonce="nonce_preflight")
+    preflight_context = {
+        **shared_event.context,
+        "body": base64.b64encode(b"").decode(),
+    }
 
     auth_handler = LabOrderWorkflowIntakeEndpoint(
         event=SimpleNamespace(
             type=EventType.SIMPLE_API_AUTHENTICATE,
-            context=shared_event.context,
+            context=preflight_context,
             target=shared_event.target,
         ),
         secrets=DEFAULT_HMAC_SECRETS,

@@ -118,6 +118,38 @@ def test_wrong_body_hash_is_rejected() -> None:
         )
 
 
+def test_compact_json_hash_is_accepted_for_json_body_variants() -> None:
+    payload = {"hello": "world", "nested": {"value": 1}, "items": ["a", "b"]}
+    compact_body = json.dumps(payload, separators=(",", ":")).encode()
+    pretty_body = json.dumps(payload, indent=2).encode()
+    timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    headers = _build_signed_headers(compact_body, timestamp=timestamp)
+    request = _build_request(payload, headers=headers)
+    request._body = base64.b64encode(pretty_body).decode()
+
+    validate_hmac_credentials(
+        HMACCredentials(request),
+        DEFAULT_HMAC_SECRETS,
+        consume_replay_nonce=True,
+    )
+
+
+def test_preflight_auth_accepts_empty_body_when_signature_is_valid() -> None:
+    payload = {"hello": "world"}
+    signed_body = _json_bytes(payload)
+    timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    headers = _build_signed_headers(signed_body, timestamp=timestamp)
+    request = _build_request(payload, headers=headers)
+    request._body = base64.b64encode(b"").decode()
+
+    validate_hmac_credentials(
+        HMACCredentials(request),
+        DEFAULT_HMAC_SECRETS,
+        consume_replay_nonce=False,
+        require_body_hash_match=False,
+    )
+
+
 def test_wrong_signature_is_rejected() -> None:
     payload = {"hello": "world"}
     timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")

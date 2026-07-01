@@ -26,6 +26,7 @@ class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
             credentials,
             self.secrets,
             consume_replay_nonce=False,
+            require_body_hash_match=False,
         )
         return True
 

@@ -1,0 +1,11 @@
+.DS_Store
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.cpa-workflow-artifacts/
+*.pyc
+*.pyo
+.env
+.env.*
+coverage/

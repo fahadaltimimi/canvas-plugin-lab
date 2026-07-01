@@ -1,32 +1,29 @@
-name: jlab-dev
+name: jlab-dev.example
 variables:
   - name: CANVAS_BASE_URL
     value: https://jlab-dev.canvasmedical.com
   - name: HMAC_CLIENT_ID
     value: purchase-flow-dev
-  - name: HMAC_SHARED_SECRET
-    value: ""
-    secret: true
+  - secret: true
+    name: HMAC_SHARED_SECRET
   - name: EXTERNAL_CHECKOUT_ID
     value: chk_example_001
   - name: CANVAS_PATIENT_ID
-    value: ""
+    value: 856c8708edab430fa959c158ce36cccc
   - name: PATIENT_FIRST_NAME
     value: Jane
   - name: PATIENT_LAST_NAME
     value: Doe
   - name: PATIENT_DOB
     value: 1990-01-01
-  - name: NOTE_UUID
-    value: ""
   - name: NOTE_TYPE_SYSTEM
     value: https://jscreen.org/fhir/CodeSystem/note-types
   - name: NOTE_TYPE_CODE
     value: genetic-test-order-review
   - name: PROVIDER_ID
-    value: ""
+    value: 066d04993c65434e8211989ded1551db
   - name: PRACTICE_LOCATION_ID
-    value: ""
+    value: b04b49b4-c6e0-414c-95ff-dfcbb18d4ceb
   - name: NOTE_TITLE
     value: Genetic test order review
   - name: LAB_PARTNER

@@ -14,3 +14,6 @@ version = "0.1.0"
 
 [tool.pytest.ini_options]
 python_files = ["*_tests.py", "test_*.py", "tests.py"]
+filterwarnings = [
+  "ignore:`json_encoders` is deprecated\\.:pydantic.warnings.PydanticDeprecatedSince20",
+]

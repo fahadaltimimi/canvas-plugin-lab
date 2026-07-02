@@ -13,7 +13,7 @@ from lab_order_workflow_example.handlers.endpoint_handler import LabOrderWorkflo
 from lab_order_workflow_example.models import LabOrderWorkflowState
 from lab_order_workflow_example.services import build_canonical_string, order_workflow
 
-DEFAULT_PATH = "/lab-order-workflow-example/orders"
+DEFAULT_PATH = "/orders"
 DEFAULT_HMAC_SECRETS = {
     "simpleapi-hmac-client-id": "purchase-flow-dev",
     "simpleapi-hmac-shared-secret": "super-secret-value",

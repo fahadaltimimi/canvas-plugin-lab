@@ -1,11 +1,11 @@
 meta {
-  name: lab-order-workflow-example/orders (create note)
+  name: orders (create note)
   type: http
   seq: 3
 }
 
 post {
-  url: {{CANVAS_BASE_URL}}/plugin-io/api/lab_order_workflow_example/lab-order-workflow-example/orders
+  url: {{CANVAS_BASE_URL}}/plugin-io/api/lab_order_workflow_example/orders
   body: json
   auth: none
 }
@@ -74,7 +74,7 @@ script:pre-request {
   const contentSha256 = CryptoJS.SHA256(rawBody).toString(CryptoJS.enc.Hex);
   const canonicalString = [
     method,
-    "/lab-order-workflow-example/orders",
+    "/orders",
     timestamp,
     nonce,
     contentSha256,

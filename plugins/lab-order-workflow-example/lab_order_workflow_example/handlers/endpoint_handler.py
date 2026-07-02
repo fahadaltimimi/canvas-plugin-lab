@@ -19,7 +19,7 @@ from lab_order_workflow_example.services import (
 
 
 class LabOrderWorkflowIntakeEndpoint(SimpleAPIRoute):
-    PATH = "/lab-order-workflow-example/orders"
+    PATH = "/orders"
 
     def authenticate(self, credentials: HMACCredentials) -> bool:
         validate_hmac_credentials(

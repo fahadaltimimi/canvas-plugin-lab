@@ -1,11 +1,11 @@
 info:
-  name: lab-order-workflow-example/orders (create note)
+  name: orders (create note)
   type: http
   seq: 3
 
 http:
   method: POST
-  url: "{{CANVAS_BASE_URL}}/plugin-io/api/lab_order_workflow_example/lab-order-workflow-example/orders"
+  url: "{{CANVAS_BASE_URL}}/plugin-io/api/lab_order_workflow_example/orders"
   headers:
     - name: Content-Type
       value: application/json
@@ -49,7 +49,7 @@ runtime:
         const method = (req.getMethod ? req.getMethod() : req.method || "POST").toUpperCase();
         const url = req.getUrl ? req.getUrl() : "";
         // Canvas passes the route-local Simple API path to the plugin handler.
-        const path = "/lab-order-workflow-example/orders";
+        const path = "/orders";
         const queryString = req.getQueryString
           ? req.getQueryString()
           : (new URL(url).search || "").replace(/^\?/, "");

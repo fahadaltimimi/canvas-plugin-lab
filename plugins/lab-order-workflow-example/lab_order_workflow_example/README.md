@@ -19,7 +19,7 @@ downstream handoff should proceed.
 
 ## Endpoint
 
-- `POST /lab-order-workflow-example/orders`
+- `POST /orders`
 
 The request uses a simplified genetic-screening payload with patient identity,
 screening type, test code, and whether manual review is required. It accepts
@@ -45,7 +45,7 @@ The intake endpoint requires HMAC-signed server-to-server headers:
 - `X-Canvas-Signature`
 
 For signature generation, the canonical path is the route-local Simple API
-path `/lab-order-workflow-example/orders`, not the outer
+path `/orders`, not the outer
 `/plugin-io/api/<plugin>/...` wrapper path used in the browser-visible URL.
 
 The plugin reads its auth config from Canvas plugin secrets:

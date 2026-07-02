@@ -45,4 +45,4 @@ Expected Bruno environment variables:
 Important signing detail:
 
 - the request URL uses the outer plugin-IO path
-- the HMAC canonical path remains `/lab-order-workflow-example/orders`
+- the HMAC canonical path remains `/orders`

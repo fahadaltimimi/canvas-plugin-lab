@@ -232,7 +232,7 @@ distributed-cache design is out of scope.
 
 ### Environment Behavior
 
-- `POST /lab-order-workflow-example/orders` must require HMAC auth
+- `POST /orders` under the plugin namespace must require HMAC auth
 - the plugin must not expose a public/debug workflow read endpoint
 
 ### Error Behavior

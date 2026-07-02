@@ -5,13 +5,13 @@ from canvas_sdk.effects import Effect
 from canvas_sdk.effects.note import Note
 from canvas_sdk.v1.data import LabOrder, NoteType
 
-from lab_order_workflow_example.models import LabOrderWorkflowState, WorkflowStatus
-from lab_order_workflow_example.services.payload_mapper import (
+from purchase_flow_lab_orders.models import LabOrderWorkflowState, WorkflowStatus
+from purchase_flow_lab_orders.services.payload_mapper import (
     InvalidPayloadError,
     MappedLabOrderRequest,
     NoteCreationContext,
 )
-from lab_order_workflow_example.services.state_store import (
+from purchase_flow_lab_orders.services.state_store import (
     assign_canvas_order_id,
     create_draft_workflow_state,
     find_by_canvas_order_id,

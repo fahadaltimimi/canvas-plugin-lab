@@ -1,6 +1,12 @@
-# Lab Order Workflow Example Plugin Spec
+# Purchase Flow Lab Orders Plugin Spec
 
 Canonical spec: `../../docs/specs/lab-order-workflow-example/plugin-spec.md`
+
+Runtime namespace:
+
+- manifest name: `purchase_flow_lab_orders`
+- package name: `purchase_flow_lab_orders`
+- intake route: `POST /orders`
 
 This plugin is a teaching example for the JScreen/Phytest-style Canvas
 lab-order workflow:

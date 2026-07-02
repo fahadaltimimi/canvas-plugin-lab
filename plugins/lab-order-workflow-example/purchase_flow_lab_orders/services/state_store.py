@@ -3,8 +3,8 @@ from uuid import uuid4
 
 from django.db import IntegrityError
 
-from lab_order_workflow_example.models import HMACNonceRecord, LabOrderWorkflowState, WorkflowStatus
-from lab_order_workflow_example.services.payload_mapper import MappedLabOrderRequest
+from purchase_flow_lab_orders.models import HMACNonceRecord, LabOrderWorkflowState, WorkflowStatus
+from purchase_flow_lab_orders.services.payload_mapper import MappedLabOrderRequest
 
 
 def generate_request_id() -> str:

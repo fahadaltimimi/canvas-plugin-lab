@@ -1,4 +1,4 @@
-lab-order-workflow-example
+purchase-flow-lab-orders
 ==========================
 
 ## Purpose

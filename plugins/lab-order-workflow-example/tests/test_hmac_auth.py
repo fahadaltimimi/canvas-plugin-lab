@@ -9,9 +9,9 @@ import pytest
 from canvas_sdk.events import EventType
 from canvas_sdk.handlers.simple_api.exceptions import AuthenticationError
 
-from lab_order_workflow_example.handlers.endpoint_handler import LabOrderWorkflowIntakeEndpoint
-from lab_order_workflow_example.services.hmac_auth import HMACAuthenticationError
-from lab_order_workflow_example.services import (
+from purchase_flow_lab_orders.handlers.endpoint_handler import LabOrderWorkflowIntakeEndpoint
+from purchase_flow_lab_orders.services.hmac_auth import HMACAuthenticationError
+from purchase_flow_lab_orders.services import (
     HMACCredentials,
     build_canonical_string,
     validate_hmac_credentials,

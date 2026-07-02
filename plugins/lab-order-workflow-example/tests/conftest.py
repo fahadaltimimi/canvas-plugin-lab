@@ -1,7 +1,7 @@
 import pytest
 from django.db import connection
 
-from lab_order_workflow_example.models import HMACNonceRecord, LabOrderWorkflowState
+from purchase_flow_lab_orders.models import HMACNonceRecord, LabOrderWorkflowState
 
 
 @pytest.fixture(scope="session", autouse=True)

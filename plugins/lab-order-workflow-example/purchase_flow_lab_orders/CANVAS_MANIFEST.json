@@ -1,16 +1,16 @@
 {
     "sdk_version": "0.1.4",
     "plugin_version": "0.0.1",
-    "name": "lab_order_workflow_example",
+    "name": "purchase_flow_lab_orders",
     "description": "Learning plugin that accepts a checkout payload through a custom endpoint and tracks a simplified Canvas lab-order sent-state workflow.",
     "components": {
         "handlers": [
             {
-                "class": "lab_order_workflow_example.handlers.endpoint_handler:LabOrderWorkflowIntakeEndpoint",
+                "class": "purchase_flow_lab_orders.handlers.endpoint_handler:LabOrderWorkflowIntakeEndpoint",
                 "description": "Accepts a simplified lab-order checkout payload through a Canvas Simple API endpoint."
             },
             {
-                "class": "lab_order_workflow_example.handlers.order_state_handler:LabOrderSentStateHandler",
+                "class": "purchase_flow_lab_orders.handlers.order_state_handler:LabOrderSentStateHandler",
                 "description": "Tracks when a related Canvas lab order reaches the sent state."
             }
         ],
@@ -20,7 +20,7 @@
         "views": []
     },
     "custom_data": {
-        "namespace": "canvaslab__lab_order_workflow_example",
+        "namespace": "canvaslab__purchase_flow_lab_orders",
         "access": "read_write"
     },
     "variables": [

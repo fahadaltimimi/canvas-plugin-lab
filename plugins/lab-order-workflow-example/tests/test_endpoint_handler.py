@@ -9,9 +9,9 @@ import pytest
 from canvas_sdk.effects import Effect, EffectType
 from canvas_sdk.events import EventType
 
-from lab_order_workflow_example.handlers.endpoint_handler import LabOrderWorkflowIntakeEndpoint
-from lab_order_workflow_example.models import LabOrderWorkflowState
-from lab_order_workflow_example.services import build_canonical_string, order_workflow
+from purchase_flow_lab_orders.handlers.endpoint_handler import LabOrderWorkflowIntakeEndpoint
+from purchase_flow_lab_orders.models import LabOrderWorkflowState
+from purchase_flow_lab_orders.services import build_canonical_string, order_workflow
 
 DEFAULT_PATH = "/orders"
 DEFAULT_HMAC_SECRETS = {

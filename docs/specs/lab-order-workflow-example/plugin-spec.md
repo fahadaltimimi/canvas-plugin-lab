@@ -1,4 +1,11 @@
-# Lab Order Workflow Example Plugin Spec
+# Purchase Flow Lab Orders Plugin Spec
+
+Runtime namespace:
+
+- manifest name: `purchase_flow_lab_orders`
+- package name: `purchase_flow_lab_orders`
+- endpoint base: `/plugin-io/api/purchase_flow_lab_orders`
+- intake route: `POST /orders`
 
 ## Summary
 
@@ -232,7 +239,8 @@ distributed-cache design is out of scope.
 
 ### Environment Behavior
 
-- `POST /orders` under the plugin namespace must require HMAC auth
+- `POST /orders` under the `purchase_flow_lab_orders` plugin namespace must
+  require HMAC auth
 - the plugin must not expose a public/debug workflow read endpoint
 
 ### Error Behavior
@@ -320,7 +328,8 @@ endpoint returns. The plugin therefore:
 
 ## Implementation Shape
 
-- one workflow-scoped plugin: `lab-order-workflow-example`
+- one workflow-scoped plugin with runtime namespace:
+  `purchase_flow_lab_orders`
 - one HMAC-protected Simple API endpoint for intake
 - one lab-order state handler for `sent` tracking
 - one small custom-data namespace for durable example state

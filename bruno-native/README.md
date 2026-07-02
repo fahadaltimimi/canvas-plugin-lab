@@ -2,7 +2,7 @@ Canvas-jscreen Native Bruno Collection
 ======================================
 
 Use this folder as a native Bruno collection when testing the
-`lab-order-workflow-example` plugin.
+`purchase_flow_lab_orders` plugin.
 
 Why this exists:
 

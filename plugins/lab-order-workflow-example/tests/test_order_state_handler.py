@@ -3,9 +3,9 @@ from types import SimpleNamespace
 import pytest
 from canvas_sdk.events import EventType
 
-from lab_order_workflow_example.handlers.order_state_handler import LabOrderSentStateHandler
-from lab_order_workflow_example.models import LabOrderWorkflowState
-from lab_order_workflow_example.services import order_workflow
+from purchase_flow_lab_orders.handlers.order_state_handler import LabOrderSentStateHandler
+from purchase_flow_lab_orders.models import LabOrderWorkflowState
+from purchase_flow_lab_orders.services import order_workflow
 
 
 def test_sent_state_updates_known_order() -> None:

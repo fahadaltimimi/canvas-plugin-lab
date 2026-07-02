@@ -1,23 +1,23 @@
-from lab_order_workflow_example.services.hmac_auth import (
+from purchase_flow_lab_orders.services.hmac_auth import (
     HMACCredentials,
     build_canonical_string,
     validate_hmac_credentials,
     validate_hmac_request,
 )
-from lab_order_workflow_example.services.order_workflow import (
+from purchase_flow_lab_orders.services.order_workflow import (
     extract_order_state,
     extract_request_id_from_order_comment,
     next_action_for_status,
     start_workflow,
     update_workflow_for_canvas_order_event,
 )
-from lab_order_workflow_example.services.payload_mapper import (
+from purchase_flow_lab_orders.services.payload_mapper import (
     InvalidPayloadError,
     MappedLabOrderRequest,
     NoteCreationContext,
     map_checkout_payload,
 )
-from lab_order_workflow_example.services.state_store import (
+from purchase_flow_lab_orders.services.state_store import (
     find_by_canvas_order_id,
     find_by_request_id,
 )

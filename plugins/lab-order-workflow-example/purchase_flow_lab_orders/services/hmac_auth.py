@@ -11,7 +11,7 @@ from canvas_sdk.handlers.simple_api import Credentials
 from canvas_sdk.handlers.simple_api.exceptions import AuthenticationError
 from logger import log
 
-from lab_order_workflow_example.services.state_store import consume_nonce, purge_expired_nonces
+from purchase_flow_lab_orders.services.state_store import consume_nonce, purge_expired_nonces
 
 if TYPE_CHECKING:
     from canvas_sdk.handlers.simple_api.api import Request

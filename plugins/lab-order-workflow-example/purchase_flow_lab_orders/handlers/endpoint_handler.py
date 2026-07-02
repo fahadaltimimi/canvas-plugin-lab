@@ -7,7 +7,7 @@ from canvas_sdk.handlers.simple_api import SimpleAPIRoute
 from canvas_sdk.handlers.simple_api.exceptions import AuthenticationError
 from logger import log
 
-from lab_order_workflow_example.services import (
+from purchase_flow_lab_orders.services import (
     HMACCredentials,
     InvalidPayloadError,
     map_checkout_payload,

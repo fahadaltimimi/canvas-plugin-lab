@@ -3,7 +3,7 @@ from canvas_sdk.events import EventType
 from canvas_sdk.handlers import BaseHandler
 from logger import log
 
-from lab_order_workflow_example.services import (
+from purchase_flow_lab_orders.services import (
     extract_order_state,
     update_workflow_for_canvas_order_event,
 )

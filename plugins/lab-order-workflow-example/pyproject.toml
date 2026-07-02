@@ -7,8 +7,8 @@ dependencies = [
 ]
 description = "Some description of your project."
 license = "MIT"
-name = "lab-order-workflow-example"
-readme = "lab_order_workflow_example/README.md"
+name = "purchase-flow-lab-orders"
+readme = "purchase_flow_lab_orders/README.md"
 requires-python = ">=3.11"
 version = "0.1.0"
 

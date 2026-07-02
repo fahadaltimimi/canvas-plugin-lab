@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: "{{CANVAS_BASE_URL}}/plugin-io/api/lab_order_workflow_example/orders"
+  url: "{{CANVAS_BASE_URL}}/plugin-io/api/purchase_flow_lab_orders/orders"
   headers:
     - name: Content-Type
       value: application/json
